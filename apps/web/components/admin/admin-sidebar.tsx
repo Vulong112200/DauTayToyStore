@@ -2,7 +2,15 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Boxes, FolderTree, LayoutDashboard, Package, ShoppingBag, Tag } from 'lucide-react';
+import {
+  Boxes,
+  FolderTree,
+  LayoutDashboard,
+  Package,
+  ShoppingBag,
+  Tag,
+  Users,
+} from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const NAV_ITEMS = [
@@ -12,6 +20,7 @@ const NAV_ITEMS = [
   { href: '/admin/inventory', label: 'Tồn kho', icon: Boxes },
   { href: '/admin/categories', label: 'Danh mục', icon: FolderTree },
   { href: '/admin/brands', label: 'Thương hiệu', icon: Tag },
+  { href: '/admin/users', label: 'Người dùng', icon: Users },
 ];
 
 export function AdminSidebar() {

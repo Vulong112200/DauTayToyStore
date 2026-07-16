@@ -1,5 +1,40 @@
 # Architecture Decisions
 
+## Phase 3 — User Management + Roles
+
+### Role-escalation and self-lockout guards live in the service, not the guard layer
+
+`RolesGuard` only answers "does this actor hold one of the roles required for this route" — it
+has no concept of *which* roles an actor may grant to *someone else*, or of an actor acting on
+their own account. Both are business rules specific to `AdminUsersService`, so they're enforced
+there: `assertCanAssignRoles` throws `ForbiddenException` if the target role set contains
+`ADMIN`/`SUPER_ADMIN` and the actor isn't `SUPER_ADMIN` (a mere `ADMIN` can create/manage `STAFF`
+and `CUSTOMER` accounts but can't mint peers or superiors); `update`/`updateRoles` both throw
+`BadRequestException` when `actorId === id` and the change would deactivate the account or alter
+its own roles (no account can lock itself out or self-promote). Verified live: a `STAFF` actor is
+rejected before even reaching the service (class-level `@Roles(ADMIN, SUPER_ADMIN)` on the
+controller excludes `STAFF` from `/admin/users` entirely); an `ADMIN` actor promoted from the
+seeded flow is correctly blocked from granting `SUPER_ADMIN` to a third user; the seeded
+`SUPER_ADMIN` is correctly blocked from deactivating or re-rolling itself, while still being able
+to act on every other account.
+
+### No delete endpoint for users, by design
+
+Unlike categories/brands (hard delete is safe per the schema's FK behavior), users are never hard
+deleted — `isActive: false` is the only "remove" affordance, so history (orders, audit logs,
+reviews) tied to a `User.id` never dangles. The admin Users page reflects this directly: there is
+no trash-can icon, only an inline edit form exposing the "Đang hoạt động" checkbox.
+
+### Edit form issues two mutations, not one, because the API models them separately
+
+`PATCH /admin/users/:id` (basic info + `isActive`) and `PATCH /admin/users/:id/roles` are
+deliberately separate endpoints — role changes are the sensitive path with the escalation guard,
+while `fullName`/`phone`/`isActive` is not. The web edit form collects both in one visual form
+but on submit diffs the selected roles against the row's original roles and only calls
+`updateRoles` when they actually changed, so a plain profile edit never touches the
+role-escalation guard path (and never fails a `SUPER_ADMIN` editing their own `fullName` just
+because the self-role-change guard would otherwise trip on a no-op roles payload).
+
 ## Phase 3 — Order + Inventory management
 
 ### The inventory reservation gap flagged in Phase 2 is now closed

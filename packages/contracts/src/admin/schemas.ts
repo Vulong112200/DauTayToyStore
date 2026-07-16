@@ -1,4 +1,6 @@
 import { z } from 'zod';
+import { passwordSchema } from '../auth/schemas.js';
+import { RoleName } from '../common/enums.js';
 import { orderStatusSchema } from '../orders/schemas.js';
 
 const slugSchema = z
@@ -255,3 +257,54 @@ export const updateInventoryInputSchema = z.object({
   lowStockThreshold: z.number().int().min(0).optional(),
 });
 export type UpdateInventoryInput = z.infer<typeof updateInventoryInputSchema>;
+
+// ---------------------------------------------------------------------------
+// Admin users
+// ---------------------------------------------------------------------------
+
+export const adminUserListItemSchema = z.object({
+  id: z.string().uuid(),
+  email: z.string().email(),
+  fullName: z.string(),
+  phone: z.string().nullable(),
+  roles: z.array(z.nativeEnum(RoleName)),
+  isActive: z.boolean(),
+  isEmailVerified: z.boolean(),
+  createdAt: z.string().datetime(),
+});
+export type AdminUserListItem = z.infer<typeof adminUserListItemSchema>;
+
+export const adminUserQuerySchema = z.object({
+  page: z.coerce.number().int().min(1).default(1),
+  pageSize: z.coerce.number().int().min(1).max(100).default(20),
+  q: z.string().optional(),
+  role: z.nativeEnum(RoleName).optional(),
+});
+export type AdminUserQuery = z.infer<typeof adminUserQuerySchema>;
+
+export const createUserInputSchema = z.object({
+  email: z.string().email('Email không hợp lệ'),
+  password: passwordSchema,
+  fullName: z.string().min(2, 'Họ tên quá ngắn').max(100),
+  phone: z
+    .string()
+    .regex(/^(0|\+84)(\d{9,10})$/, 'Số điện thoại không hợp lệ')
+    .optional(),
+  roles: z.array(z.nativeEnum(RoleName)).min(1, 'Phải chọn ít nhất 1 vai trò'),
+});
+export type CreateUserInput = z.infer<typeof createUserInputSchema>;
+
+export const adminUpdateUserInputSchema = z.object({
+  fullName: z.string().min(2, 'Họ tên quá ngắn').max(100).optional(),
+  phone: z
+    .string()
+    .regex(/^(0|\+84)(\d{9,10})$/, 'Số điện thoại không hợp lệ')
+    .optional(),
+  isActive: z.boolean().optional(),
+});
+export type AdminUpdateUserInput = z.infer<typeof adminUpdateUserInputSchema>;
+
+export const updateUserRolesInputSchema = z.object({
+  roles: z.array(z.nativeEnum(RoleName)).min(1, 'Phải có ít nhất 1 vai trò'),
+});
+export type UpdateUserRolesInput = z.infer<typeof updateUserRolesInputSchema>;
