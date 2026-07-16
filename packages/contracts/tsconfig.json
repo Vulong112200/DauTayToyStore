@@ -1,0 +1,9 @@
+{
+  "extends": "@repo/config-ts/base.json",
+  "compilerOptions": {
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "noEmit": true
+  },
+  "include": ["src"]
+}

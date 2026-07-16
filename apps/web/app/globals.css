@@ -1,0 +1,91 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 30 100% 98%;
+    --foreground: 240 10% 15%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 240 10% 15%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 240 10% 15%;
+
+    --primary: 340 82% 68%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 200 90% 88%;
+    --secondary-foreground: 210 50% 20%;
+
+    --accent: 48 96% 76%;
+    --accent-foreground: 30 60% 20%;
+
+    --muted: 30 20% 94%;
+    --muted-foreground: 240 5% 40%;
+
+    --destructive: 0 72% 60%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 240 10% 90%;
+    --input: 240 10% 88%;
+    --ring: 340 82% 68%;
+
+    --pastel-pink: 340 100% 90%;
+    --pastel-blue: 200 100% 88%;
+    --pastel-yellow: 48 100% 85%;
+    --pastel-mint: 160 70% 88%;
+    --pastel-lavender: 265 80% 92%;
+
+    --radius: 1rem;
+
+    --font-sans: 'Be Vietnam Pro', system-ui, sans-serif;
+    --font-display: 'Baloo 2', 'Be Vietnam Pro', system-ui, sans-serif;
+  }
+
+  :root[data-theme='dark'],
+  .dark {
+    --background: 240 25% 9%;
+    --foreground: 0 0% 95%;
+
+    --card: 240 20% 12%;
+    --card-foreground: 0 0% 95%;
+
+    --popover: 240 20% 12%;
+    --popover-foreground: 0 0% 95%;
+
+    --primary: 340 82% 68%;
+    --primary-foreground: 240 25% 9%;
+
+    --secondary: 200 40% 22%;
+    --secondary-foreground: 0 0% 95%;
+
+    --accent: 48 60% 40%;
+    --accent-foreground: 0 0% 95%;
+
+    --muted: 240 15% 16%;
+    --muted-foreground: 240 5% 65%;
+
+    --destructive: 0 62% 45%;
+    --destructive-foreground: 0 0% 95%;
+
+    --border: 240 15% 20%;
+    --input: 240 15% 20%;
+    --ring: 340 82% 68%;
+
+    --pastel-pink: 340 50% 30%;
+    --pastel-blue: 200 45% 28%;
+    --pastel-yellow: 48 45% 28%;
+    --pastel-mint: 160 35% 26%;
+    --pastel-lavender: 265 35% 30%;
+  }
+
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground antialiased;
+  }
+}
