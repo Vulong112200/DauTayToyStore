@@ -6,6 +6,7 @@ import {
   type CategoryInput,
   categoryInputSchema,
 } from '@repo/contracts';
+import { AuditLog } from '../../../common/decorators/audit-log.decorator';
 import { Roles } from '../../../common/decorators/roles.decorator';
 import { ZodValidationPipe } from '../../../common/pipes/zod-validation.pipe';
 import { AdminCategoriesService } from './admin-categories.service';
@@ -14,6 +15,7 @@ import { AdminCategoriesService } from './admin-categories.service';
 @ApiBearerAuth()
 @Controller('admin/categories')
 @Roles(RoleName.ADMIN, RoleName.SUPER_ADMIN, RoleName.STAFF)
+@AuditLog('Category')
 export class AdminCategoriesController {
   constructor(private readonly adminCategoriesService: AdminCategoriesService) {}
 

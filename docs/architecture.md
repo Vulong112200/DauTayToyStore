@@ -1,5 +1,55 @@
 # Architecture Decisions
 
+## Phase 3 — Audit Logs + Reports
+
+### A generic, decorator-driven interceptor replaces per-service `record()` calls
+
+Phase 1 built `AuditLogService.record()` and `AuditLog` (before/after JSON, actor, ip, ua) but
+the only caller was `AuthService` (register/login/Google login), each with a hand-written call.
+Hand-writing `record()` into every admin service (products, categories, brands, users, orders,
+inventory, blog, banners, coupons, flash sales — 11 controllers) would mean 11+ near-identical
+edits and an easy place to forget one on the next new admin module. Instead, `AuditLogInterceptor`
+(registered globally via `APP_INTERCEPTOR`, alongside the existing `LoggingInterceptor`) reads an
+`@AuditLog('EntityType')` class decorator via `Reflector` and — only for mutating verbs
+(POST/PATCH/PUT/DELETE; GET is always skipped even on a decorated controller) — derives
+`action` (`${entityType}.create/update/delete`), `entityId` (route `:id`/`:productId` param, else
+`.id`/`.productId` off the response body), and `actorId` (`request.user.id`) automatically. Each
+of the 11 controllers only needed one import + one class-level decorator line, not a service
+rewrite — this is what let "applied broadly" (the original Phase 1 architecture note) actually
+happen in one slice instead of being deferred again. `AuthService`'s existing manual calls are
+untouched — they predate the decorator and use action names (`user.login`, `user.register`) that
+don't fit the entity-based convention anyway.
+
+### No "before" snapshot for interceptor-driven logs — a known, accepted gap
+
+The interceptor has no pre-fetch step, so `before` is always `undefined` for automatically-logged
+mutations (`after` is the response body; `DELETE` responses are just `{success:true}`, so `after`
+is also skipped there and only `entityId` is recorded). This matches what `AuthService`'s manual
+calls already do — none of them populate `before`/`after` either. Getting real diffs would mean
+fetching the entity pre-mutation in the interceptor (a second DB round-trip per mutating request,
+generically, for every decorated controller) or threading old-state through every service; both
+were judged not worth it for this slice given no consumer of `before` exists yet. The `AuditLog`
+row/contract still carries the field for whenever that's worth doing per-module.
+
+### Audit log viewing is ADMIN/SUPER_ADMIN only; Reports stay open to STAFF
+
+`AdminAuditLogController` uses `@Roles(ADMIN, SUPER_ADMIN)` with no `STAFF` — audit rows include
+IP addresses and full request/response snapshots for every admin action, which is more sensitive
+than the read-only aggregate numbers in Reports (`@Roles(ADMIN, SUPER_ADMIN, STAFF)`, matching
+Dashboard's existing convention). Verified live: a STAFF actor gets 403 on `/admin/audit-logs`
+but 200 on `/admin/reports/order-status-breakdown`.
+
+### Reports bucket revenue in application code, not `$queryRaw`
+
+Grouping orders by day/month for a revenue-over-time report isn't expressible as a plain Prisma
+`groupBy` (no date-truncation support), and the standard workaround is a raw SQL
+`date_trunc(...)` query. Given this admin panel's order volumes, `AdminReportsService.revenueOverTime`
+instead fetches `{createdAt, total}` for orders in the requested window (excluding
+CANCELLED/REFUNDED, same exclusion Dashboard's revenue sum already uses) and buckets them in JS
+by `.toISOString().slice(0, 10 or 7)`. This avoids introducing the codebase's first raw-SQL call
+for what's currently a small, bounded read — `topProducts` and `orderStatusBreakdown`, by
+contrast, group by a single discrete column each and use real Prisma `groupBy` fine.
+
 ## Phase 3 — Coupon + Flash Sale management
 
 ### Scope: Coupon is fully wired end-to-end; Flash Sale is admin CRUD only

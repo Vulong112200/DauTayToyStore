@@ -6,6 +6,7 @@ import {
   type BlogCategoryInput,
   blogCategoryInputSchema,
 } from '@repo/contracts';
+import { AuditLog } from '../../../common/decorators/audit-log.decorator';
 import { Roles } from '../../../common/decorators/roles.decorator';
 import { ZodValidationPipe } from '../../../common/pipes/zod-validation.pipe';
 import { AdminBlogCategoriesService } from './admin-blog-categories.service';
@@ -14,6 +15,7 @@ import { AdminBlogCategoriesService } from './admin-blog-categories.service';
 @ApiBearerAuth()
 @Controller('admin/blog-categories')
 @Roles(RoleName.ADMIN, RoleName.SUPER_ADMIN, RoleName.STAFF)
+@AuditLog('BlogCategory')
 export class AdminBlogCategoriesController {
   constructor(private readonly adminBlogCategoriesService: AdminBlogCategoriesService) {}
 

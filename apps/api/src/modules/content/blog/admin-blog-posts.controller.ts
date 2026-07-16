@@ -10,6 +10,7 @@ import {
   adminBlogPostQuerySchema,
   blogPostInputSchema,
 } from '@repo/contracts';
+import { AuditLog } from '../../../common/decorators/audit-log.decorator';
 import { Roles } from '../../../common/decorators/roles.decorator';
 import { ZodValidationPipe } from '../../../common/pipes/zod-validation.pipe';
 import { AdminBlogPostsService } from './admin-blog-posts.service';
@@ -18,6 +19,7 @@ import { AdminBlogPostsService } from './admin-blog-posts.service';
 @ApiBearerAuth()
 @Controller('admin/blog-posts')
 @Roles(RoleName.ADMIN, RoleName.SUPER_ADMIN, RoleName.STAFF)
+@AuditLog('BlogPost')
 export class AdminBlogPostsController {
   constructor(private readonly adminBlogPostsService: AdminBlogPostsService) {}
 

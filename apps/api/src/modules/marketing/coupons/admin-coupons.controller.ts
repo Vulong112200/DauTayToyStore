@@ -9,6 +9,7 @@ import {
   adminCouponQuerySchema,
   couponInputSchema,
 } from '@repo/contracts';
+import { AuditLog } from '../../../common/decorators/audit-log.decorator';
 import { Roles } from '../../../common/decorators/roles.decorator';
 import { ZodValidationPipe } from '../../../common/pipes/zod-validation.pipe';
 import { AdminCouponsService } from './admin-coupons.service';
@@ -17,6 +18,7 @@ import { AdminCouponsService } from './admin-coupons.service';
 @ApiBearerAuth()
 @Controller('admin/coupons')
 @Roles(RoleName.ADMIN, RoleName.SUPER_ADMIN, RoleName.STAFF)
+@AuditLog('Coupon')
 export class AdminCouponsController {
   constructor(private readonly adminCouponsService: AdminCouponsService) {}
 

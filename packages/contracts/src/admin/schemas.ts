@@ -515,3 +515,61 @@ export const adminFlashSaleDetailSchema = z.object({
   items: z.array(adminFlashSaleItemSchema),
 });
 export type AdminFlashSaleDetail = z.infer<typeof adminFlashSaleDetailSchema>;
+
+// --- Admin audit logs ---
+
+export const adminAuditLogItemSchema = z.object({
+  id: z.string().uuid(),
+  actorId: z.string().uuid().nullable(),
+  actorEmail: z.string().nullable(),
+  action: z.string(),
+  entityType: z.string(),
+  entityId: z.string().nullable(),
+  before: z.unknown().nullable(),
+  after: z.unknown().nullable(),
+  ipAddress: z.string().nullable(),
+  userAgent: z.string().nullable(),
+  createdAt: z.string().datetime(),
+});
+export type AdminAuditLogItem = z.infer<typeof adminAuditLogItemSchema>;
+
+export const adminAuditLogQuerySchema = z.object({
+  page: z.coerce.number().int().min(1).default(1),
+  pageSize: z.coerce.number().int().min(1).max(100).default(20),
+  actorId: z.string().uuid().optional(),
+  entityType: z.string().optional(),
+  action: z.string().optional(),
+  dateFrom: z.string().datetime().optional(),
+  dateTo: z.string().datetime().optional(),
+});
+export type AdminAuditLogQuery = z.infer<typeof adminAuditLogQuerySchema>;
+
+// --- Admin reports ---
+
+export const reportRangeQuerySchema = z.object({
+  from: z.string().datetime().optional(),
+  to: z.string().datetime().optional(),
+  groupBy: z.enum(['day', 'month']).default('day'),
+});
+export type ReportRangeQuery = z.infer<typeof reportRangeQuerySchema>;
+
+export const revenueReportPointSchema = z.object({
+  bucket: z.string(),
+  revenue: z.number().int(),
+  orderCount: z.number().int(),
+});
+export type RevenueReportPoint = z.infer<typeof revenueReportPointSchema>;
+
+export const topProductReportItemSchema = z.object({
+  productId: z.string().uuid(),
+  productName: z.string(),
+  quantitySold: z.number().int(),
+  revenue: z.number().int(),
+});
+export type TopProductReportItem = z.infer<typeof topProductReportItemSchema>;
+
+export const orderStatusBreakdownItemSchema = z.object({
+  status: orderStatusSchema,
+  count: z.number().int(),
+});
+export type OrderStatusBreakdownItem = z.infer<typeof orderStatusBreakdownItemSchema>;

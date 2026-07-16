@@ -3,8 +3,10 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
+  BarChart3,
   Boxes,
   FolderTree,
+  History,
   Image as ImageIcon,
   LayoutDashboard,
   Newspaper,
@@ -30,6 +32,8 @@ const NAV_ITEMS = [
   { href: '/admin/blog-categories', label: 'Danh mục blog', icon: FolderTree },
   { href: '/admin/banners', label: 'Banner', icon: ImageIcon },
   { href: '/admin/users', label: 'Người dùng', icon: Users },
+  { href: '/admin/reports', label: 'Báo cáo', icon: BarChart3 },
+  { href: '/admin/audit-logs', label: 'Nhật ký hệ thống', icon: History },
 ];
 
 export function AdminSidebar() {

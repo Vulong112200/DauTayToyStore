@@ -10,6 +10,7 @@ import {
   adminOrderQuerySchema,
   updateOrderStatusInputSchema,
 } from '@repo/contracts';
+import { AuditLog } from '../../common/decorators/audit-log.decorator';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe';
 import { AdminOrdersService } from './admin-orders.service';
@@ -18,6 +19,7 @@ import { AdminOrdersService } from './admin-orders.service';
 @ApiBearerAuth()
 @Controller('admin/orders')
 @Roles(RoleName.ADMIN, RoleName.SUPER_ADMIN, RoleName.STAFF)
+@AuditLog('Order')
 export class AdminOrdersController {
   constructor(private readonly adminOrdersService: AdminOrdersService) {}
 

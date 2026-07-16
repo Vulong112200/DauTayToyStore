@@ -9,6 +9,7 @@ import {
   adminInventoryQuerySchema,
   updateInventoryInputSchema,
 } from '@repo/contracts';
+import { AuditLog } from '../../common/decorators/audit-log.decorator';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe';
 import { InventoryService } from './inventory.service';
@@ -17,6 +18,7 @@ import { InventoryService } from './inventory.service';
 @ApiBearerAuth()
 @Controller('admin/inventory')
 @Roles(RoleName.ADMIN, RoleName.SUPER_ADMIN, RoleName.STAFF)
+@AuditLog('Inventory')
 export class InventoryController {
   constructor(private readonly inventoryService: InventoryService) {}
 

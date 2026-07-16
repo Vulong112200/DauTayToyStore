@@ -1,4 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
+import type { AdminAuditLogItem, AdminAuditLogQuery, PaginatedResponse } from '@repo/contracts';
 import { PrismaService } from '../../infra/prisma/prisma.service';
 
 export interface RecordAuditLogInput {
@@ -11,6 +13,9 @@ export interface RecordAuditLogInput {
   ipAddress?: string | null;
   userAgent?: string | null;
 }
+
+const LIST_INCLUDE = { actor: { select: { email: true } } } satisfies Prisma.AuditLogInclude;
+type AuditLogRow = Prisma.AuditLogGetPayload<{ include: typeof LIST_INCLUDE }>;
 
 @Injectable()
 export class AuditLogService {
@@ -35,5 +40,56 @@ export class AuditLogService {
     } catch (error) {
       this.logger.error('Failed to record audit log', error instanceof Error ? error.stack : undefined);
     }
+  }
+
+  async findList(query: AdminAuditLogQuery): Promise<PaginatedResponse<AdminAuditLogItem>> {
+    const where: Prisma.AuditLogWhereInput = {
+      ...(query.actorId && { actorId: query.actorId }),
+      ...(query.entityType && { entityType: query.entityType }),
+      ...(query.action && { action: query.action }),
+      ...((query.dateFrom || query.dateTo) && {
+        createdAt: {
+          ...(query.dateFrom && { gte: new Date(query.dateFrom) }),
+          ...(query.dateTo && { lte: new Date(query.dateTo) }),
+        },
+      }),
+    };
+
+    const [rows, totalItems] = await Promise.all([
+      this.prisma.auditLog.findMany({
+        where,
+        include: LIST_INCLUDE,
+        orderBy: { createdAt: 'desc' },
+        skip: (query.page - 1) * query.pageSize,
+        take: query.pageSize,
+      }),
+      this.prisma.auditLog.count({ where }),
+    ]);
+
+    return {
+      items: rows.map((row) => this.toView(row)),
+      meta: {
+        page: query.page,
+        pageSize: query.pageSize,
+        totalItems,
+        totalPages: Math.max(1, Math.ceil(totalItems / query.pageSize)),
+      },
+    };
+  }
+
+  private toView(row: AuditLogRow): AdminAuditLogItem {
+    return {
+      id: row.id,
+      actorId: row.actorId,
+      actorEmail: row.actor?.email ?? null,
+      action: row.action,
+      entityType: row.entityType,
+      entityId: row.entityId,
+      before: row.before,
+      after: row.after,
+      ipAddress: row.ipAddress,
+      userAgent: row.userAgent,
+      createdAt: row.createdAt.toISOString(),
+    };
   }
 }

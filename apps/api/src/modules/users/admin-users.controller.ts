@@ -13,6 +13,7 @@ import {
   createUserInputSchema,
   updateUserRolesInputSchema,
 } from '@repo/contracts';
+import { AuditLog } from '../../common/decorators/audit-log.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe';
@@ -23,6 +24,7 @@ import { AdminUsersService } from './admin-users.service';
 @ApiBearerAuth()
 @Controller('admin/users')
 @Roles(RoleName.ADMIN, RoleName.SUPER_ADMIN)
+@AuditLog('User')
 export class AdminUsersController {
   constructor(private readonly adminUsersService: AdminUsersService) {}
 

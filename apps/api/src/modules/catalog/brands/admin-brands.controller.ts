@@ -2,6 +2,7 @@ import { Body, Controller, Delete, Get, Param, Patch, Post } from '@nestjs/commo
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { RoleName } from '@prisma/client';
 import { type AdminBrand, type BrandInput, brandInputSchema } from '@repo/contracts';
+import { AuditLog } from '../../../common/decorators/audit-log.decorator';
 import { Roles } from '../../../common/decorators/roles.decorator';
 import { ZodValidationPipe } from '../../../common/pipes/zod-validation.pipe';
 import { AdminBrandsService } from './admin-brands.service';
@@ -10,6 +11,7 @@ import { AdminBrandsService } from './admin-brands.service';
 @ApiBearerAuth()
 @Controller('admin/brands')
 @Roles(RoleName.ADMIN, RoleName.SUPER_ADMIN, RoleName.STAFF)
+@AuditLog('Brand')
 export class AdminBrandsController {
   constructor(private readonly adminBrandsService: AdminBrandsService) {}
 

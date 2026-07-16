@@ -7,6 +7,7 @@ import {
   type FlashSaleInput,
   flashSaleInputSchema,
 } from '@repo/contracts';
+import { AuditLog } from '../../../common/decorators/audit-log.decorator';
 import { Roles } from '../../../common/decorators/roles.decorator';
 import { ZodValidationPipe } from '../../../common/pipes/zod-validation.pipe';
 import { AdminFlashSalesService } from './admin-flash-sales.service';
@@ -15,6 +16,7 @@ import { AdminFlashSalesService } from './admin-flash-sales.service';
 @ApiBearerAuth()
 @Controller('admin/flash-sales')
 @Roles(RoleName.ADMIN, RoleName.SUPER_ADMIN, RoleName.STAFF)
+@AuditLog('FlashSale')
 export class AdminFlashSalesController {
   constructor(private readonly adminFlashSalesService: AdminFlashSalesService) {}
 
