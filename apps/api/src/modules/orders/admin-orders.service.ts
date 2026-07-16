@@ -108,6 +108,15 @@ export class AdminOrdersService {
             data: { quantityReserved: { decrement: item.quantity } },
           });
         }
+
+        // Refund the voucher balance this order consumed — mirrors the inventory
+        // release above: cancelling means the store credit was never actually spent.
+        if (order.giftVoucherId && order.giftVoucherAmount > 0) {
+          await tx.giftVoucher.update({
+            where: { id: order.giftVoucherId },
+            data: { balance: { increment: order.giftVoucherAmount }, redeemedAt: null },
+          });
+        }
       }
 
       if (input.status === OrderStatus.SHIPPED) {

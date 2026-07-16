@@ -9,8 +9,10 @@ import { Input } from '@/components/ui/input';
 import {
   useApplyCoupon,
   useCart,
+  useRedeemVoucher,
   useRemoveCartItem,
   useRemoveCoupon,
+  useRemoveVoucher,
   useUpdateCartItem,
 } from '@/hooks/use-cart';
 import { ApiError } from '@/lib/api-client';
@@ -25,6 +27,11 @@ export function CartView() {
   const [couponCode, setCouponCode] = React.useState('');
   const [couponError, setCouponError] = React.useState<string | null>(null);
 
+  const redeemVoucher = useRedeemVoucher();
+  const removeVoucher = useRemoveVoucher();
+  const [voucherCode, setVoucherCode] = React.useState('');
+  const [voucherError, setVoucherError] = React.useState<string | null>(null);
+
   async function handleApplyCoupon(event: React.FormEvent) {
     event.preventDefault();
     setCouponError(null);
@@ -33,6 +40,17 @@ export function CartView() {
       setCouponCode('');
     } catch (error) {
       setCouponError(error instanceof ApiError ? error.message : 'Không thể áp dụng mã giảm giá');
+    }
+  }
+
+  async function handleRedeemVoucher(event: React.FormEvent) {
+    event.preventDefault();
+    setVoucherError(null);
+    try {
+      await redeemVoucher.mutateAsync({ code: voucherCode });
+      setVoucherCode('');
+    } catch (error) {
+      setVoucherError(error instanceof ApiError ? error.message : 'Không thể áp dụng phiếu quà tặng');
     }
   }
 
@@ -196,6 +214,51 @@ export function CartView() {
           <div className="mt-2 flex justify-between text-sm">
             <span className="text-muted-foreground">Giảm giá</span>
             <span className="font-medium text-destructive">-{formatVnd(cart.discountTotal)}</span>
+          </div>
+        )}
+
+        {cart.voucherCode ? (
+          <div className="mt-3 flex items-center justify-between text-sm">
+            <span className="text-muted-foreground">
+              Phiếu quà tặng:{' '}
+              <span className="font-medium text-foreground">{cart.voucherCode}</span>
+            </span>
+            <button
+              type="button"
+              className="text-destructive hover:underline disabled:opacity-50"
+              disabled={removeVoucher.isPending}
+              onClick={() => removeVoucher.mutate()}
+            >
+              Gỡ phiếu
+            </button>
+          </div>
+        ) : (
+          <form onSubmit={handleRedeemVoucher} className="mt-3 flex gap-2">
+            <Input
+              value={voucherCode}
+              onChange={(event) => setVoucherCode(event.target.value)}
+              placeholder="Nhập mã phiếu quà tặng"
+              aria-label="Mã phiếu quà tặng"
+              className="h-9 text-sm"
+            />
+            <Button
+              type="submit"
+              variant="outline"
+              size="sm"
+              disabled={redeemVoucher.isPending || !voucherCode.trim()}
+            >
+              Áp dụng
+            </Button>
+          </form>
+        )}
+        {voucherError && <p className="mt-1 text-xs text-destructive">{voucherError}</p>}
+
+        {cart.voucherDiscountTotal > 0 && (
+          <div className="mt-2 flex justify-between text-sm">
+            <span className="text-muted-foreground">Phiếu quà tặng</span>
+            <span className="font-medium text-destructive">
+              -{formatVnd(cart.voucherDiscountTotal)}
+            </span>
           </div>
         )}
 

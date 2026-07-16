@@ -33,6 +33,8 @@ export const cartViewSchema = z.object({
   appliedPromotions: z.array(appliedPromotionSchema),
   couponCode: z.string().nullable(),
   discountTotal: z.number().int(),
+  voucherCode: z.string().nullable(),
+  voucherDiscountTotal: z.number().int(),
   total: z.number().int(),
 });
 export type CartView = z.infer<typeof cartViewSchema>;
@@ -57,3 +59,12 @@ export const applyCartCouponSchema = z.object({
     .transform((value) => value.toUpperCase()),
 });
 export type ApplyCartCouponInput = z.infer<typeof applyCartCouponSchema>;
+
+export const redeemGiftVoucherSchema = z.object({
+  code: z
+    .string()
+    .min(3, 'Mã quá ngắn')
+    .max(30)
+    .transform((value) => value.toUpperCase()),
+});
+export type RedeemGiftVoucherInput = z.infer<typeof redeemGiftVoucherSchema>;

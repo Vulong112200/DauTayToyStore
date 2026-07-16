@@ -2,6 +2,7 @@ import type {
   AddCartItemInput,
   ApplyCartCouponInput,
   CartView,
+  RedeemGiftVoucherInput,
   UpdateCartItemInput,
 } from '@repo/contracts';
 import { apiFetch } from '../api-client';
@@ -31,4 +32,10 @@ export const cartApi = {
 
   removeCoupon: () =>
     apiFetch<CartView>('/cart/coupon', { method: 'DELETE', headers: cartIdentityHeaders() }),
+
+  redeemVoucher: (input: RedeemGiftVoucherInput) =>
+    apiFetch<CartView>('/cart/gift-voucher', { body: input, headers: cartIdentityHeaders() }),
+
+  removeVoucher: () =>
+    apiFetch<CartView>('/cart/gift-voucher', { method: 'DELETE', headers: cartIdentityHeaders() }),
 };

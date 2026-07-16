@@ -8,6 +8,7 @@ import {
   assertCouponUserUsable,
   computeCouponDiscount,
 } from '../../common/utils/coupon.util';
+import { assertVoucherUsable, computeVoucherDiscount } from '../../common/utils/gift-voucher.util';
 import { resolveAvailableStock } from '../../common/utils/inventory.util';
 import { PromotionEngineResult, runPromotionEngine } from '../../common/utils/promotion-engine.util';
 import { PrismaService } from '../../infra/prisma/prisma.service';
@@ -181,14 +182,34 @@ export class CartService {
     return this.loadCartView(cart.id);
   }
 
+  async redeemVoucher(identity: CartIdentity, code: string): Promise<CartView> {
+    const cart = await this.getOrCreateCart(identity);
+
+    const voucher = await this.prisma.giftVoucher.findUnique({ where: { code } });
+    if (!voucher) {
+      throw new NotFoundException('Phiếu quà tặng không tồn tại');
+    }
+    assertVoucherUsable(voucher);
+
+    await this.prisma.cart.update({ where: { id: cart.id }, data: { voucherId: voucher.id } });
+
+    return this.loadCartView(cart.id);
+  }
+
+  async removeVoucher(identity: CartIdentity): Promise<CartView> {
+    const cart = await this.getOrCreateCart(identity);
+    await this.prisma.cart.update({ where: { id: cart.id }, data: { voucherId: null } });
+    return this.loadCartView(cart.id);
+  }
+
   /**
    * Called right after a successful login/register/Google-login when the request carried a
    * guest `x-cart-session` — folds that guest cart's items into the user's own cart (creating
    * one if they didn't have one yet) and discards the guest cart. Quantities for the same
    * (productId, variantId) are summed rather than overwritten; stock/flash-sale caps are not
    * re-checked here (same as elsewhere, checkout is the final backstop) so a merge can never
-   * itself throw and block a login. The guest cart's coupon only carries over if the user's
-   * cart doesn't already have one — an existing applied coupon on the account wins.
+   * itself throw and block a login. The guest cart's coupon/voucher only carry over if the
+   * user's cart doesn't already have one — an existing applied coupon/voucher on the account wins.
    */
   async mergeGuestCartIntoUserCart(userId: string, sessionId: string): Promise<void> {
     const guestCart = await this.prisma.cart.findUnique({
@@ -237,6 +258,10 @@ export class CartService {
 
       if (guestCart.couponId && !userCart.couponId) {
         await tx.cart.update({ where: { id: userCart.id }, data: { couponId: guestCart.couponId } });
+      }
+
+      if (guestCart.voucherId && !userCart.voucherId) {
+        await tx.cart.update({ where: { id: userCart.id }, data: { voucherId: guestCart.voucherId } });
       }
 
       // Cascades onto guestCart's own CartItem rows — already copied above, so this just
@@ -304,7 +329,7 @@ export class CartService {
   private async loadCartView(cartId: string): Promise<CartView> {
     const cart = await this.prisma.cart.findUniqueOrThrow({
       where: { id: cartId },
-      include: { coupon: true },
+      include: { coupon: true, voucher: true },
     });
     const { items, engineResult } = await this.loadCartContext(cartId);
 
@@ -347,6 +372,21 @@ export class CartService {
       }
     }
 
+    const netAfterCoupon = engineResult.netSubtotal - discountTotal;
+
+    // Same recompute-on-every-read tradeoff as the coupon above: if the voucher's balance
+    // was spent elsewhere (or it expired/was deactivated) between redeem and checkout, the
+    // discount silently drops to 0 here rather than needing a separate "unapply" step.
+    let voucherDiscountTotal = 0;
+    if (cart.voucher) {
+      try {
+        assertVoucherUsable(cart.voucher);
+        voucherDiscountTotal = computeVoucherDiscount(cart.voucher, netAfterCoupon);
+      } catch {
+        voucherDiscountTotal = 0;
+      }
+    }
+
     return {
       id: cartId,
       items: views,
@@ -356,7 +396,9 @@ export class CartService {
       appliedPromotions: engineResult.appliedPromotions,
       couponCode: cart.coupon?.code ?? null,
       discountTotal,
-      total: engineResult.netSubtotal - discountTotal,
+      voucherCode: cart.voucher?.code ?? null,
+      voucherDiscountTotal,
+      total: netAfterCoupon - voucherDiscountTotal,
     };
   }
 }

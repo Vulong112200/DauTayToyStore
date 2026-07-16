@@ -4,9 +4,11 @@ import {
   type AddCartItemInput,
   type ApplyCartCouponInput,
   type CartView,
+  type RedeemGiftVoucherInput,
   type UpdateCartItemInput,
   addCartItemSchema,
   applyCartCouponSchema,
+  redeemGiftVoucherSchema,
   updateCartItemSchema,
 } from '@repo/contracts';
 import { CartIdentity } from '../../common/cart-identity/cart-identity';
@@ -70,5 +72,20 @@ export class CartController {
   @ApiOperation({ summary: 'Gỡ mã giảm giá khỏi giỏ hàng' })
   removeCoupon(@CurrentCartIdentity() identity: CartIdentity): Promise<CartView> {
     return this.cartService.removeCoupon(identity);
+  }
+
+  @Post('gift-voucher')
+  @ApiOperation({ summary: 'Áp dụng phiếu quà tặng vào giỏ hàng' })
+  redeemVoucher(
+    @CurrentCartIdentity() identity: CartIdentity,
+    @Body(new ZodValidationPipe(redeemGiftVoucherSchema)) body: RedeemGiftVoucherInput,
+  ): Promise<CartView> {
+    return this.cartService.redeemVoucher(identity, body.code);
+  }
+
+  @Delete('gift-voucher')
+  @ApiOperation({ summary: 'Gỡ phiếu quà tặng khỏi giỏ hàng' })
+  removeVoucher(@CurrentCartIdentity() identity: CartIdentity): Promise<CartView> {
+    return this.cartService.removeVoucher(identity);
   }
 }

@@ -7,6 +7,7 @@ describe('AdminOrdersService', () => {
   let prisma: {
     order: { findMany: jest.Mock; count: jest.Mock; findUnique: jest.Mock; update: jest.Mock };
     inventory: { updateMany: jest.Mock };
+    giftVoucher: { update: jest.Mock };
     orderStatusHistory: { create: jest.Mock };
     $transaction: jest.Mock;
   };
@@ -15,11 +16,13 @@ describe('AdminOrdersService', () => {
     prisma = {
       order: { findMany: jest.fn(), count: jest.fn(), findUnique: jest.fn(), update: jest.fn() },
       inventory: { updateMany: jest.fn() },
+      giftVoucher: { update: jest.fn() },
       orderStatusHistory: { create: jest.fn() },
       $transaction: jest.fn(async (callback: (tx: unknown) => unknown) =>
         callback({
           order: { update: prisma.order.update },
           inventory: { updateMany: prisma.inventory.updateMany },
+          giftVoucher: { update: prisma.giftVoucher.update },
           orderStatusHistory: { create: prisma.orderStatusHistory.create },
         }),
       ),
@@ -127,6 +130,26 @@ describe('AdminOrdersService', () => {
       });
       expect(prisma.orderStatusHistory.create).toHaveBeenCalledWith({
         data: { orderId: 'o1', status: 'CANCELLED', note: undefined },
+      });
+      expect(prisma.giftVoucher.update).not.toHaveBeenCalled();
+    });
+
+    it('refunds the gift voucher balance when cancelling an order that used one', async () => {
+      prisma.order.findUnique
+        .mockResolvedValueOnce({
+          id: 'o1',
+          status: 'PENDING',
+          items: [{ productId: 'p1', variantId: null, quantity: 2 }],
+          giftVoucherId: 'v1',
+          giftVoucherAmount: 50_000,
+        })
+        .mockResolvedValueOnce(fullOrderRow);
+
+      await service.updateStatus('o1', { status: 'CANCELLED' });
+
+      expect(prisma.giftVoucher.update).toHaveBeenCalledWith({
+        where: { id: 'v1' },
+        data: { balance: { increment: 50_000 }, redeemedAt: null },
       });
     });
 

@@ -75,6 +75,18 @@ export function OrderConfirmationView({ orderNumber }: { orderNumber: string }) 
             <span className="text-muted-foreground">Tạm tính</span>
             <span>{formatVnd(order.subtotal)}</span>
           </div>
+          {order.discountTotal > 0 && (
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Giảm giá</span>
+              <span className="text-destructive">-{formatVnd(order.discountTotal)}</span>
+            </div>
+          )}
+          {order.giftVoucherAmount > 0 && (
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Phiếu quà tặng</span>
+              <span className="text-destructive">-{formatVnd(order.giftVoucherAmount)}</span>
+            </div>
+          )}
           <div className="flex justify-between">
             <span className="text-muted-foreground">Phí vận chuyển</span>
             <span>{order.shippingFee === 0 ? 'Miễn phí' : formatVnd(order.shippingFee)}</span>

@@ -14,6 +14,7 @@ describe('CartService', () => {
     product: { findUnique: jest.Mock };
     productVariant: { findUnique: jest.Mock };
     coupon: { findUnique: jest.Mock };
+    giftVoucher: { findUnique: jest.Mock };
     order: { count: jest.Mock };
     cart: {
       upsert: jest.Mock;
@@ -39,11 +40,12 @@ describe('CartService', () => {
       product: { findUnique: jest.fn() },
       productVariant: { findUnique: jest.fn() },
       coupon: { findUnique: jest.fn() },
+      giftVoucher: { findUnique: jest.fn() },
       order: { count: jest.fn() },
       cart: {
         upsert: jest.fn().mockResolvedValue(cart),
         update: jest.fn(),
-        findUniqueOrThrow: jest.fn().mockResolvedValue({ ...cart, coupon: null }),
+        findUniqueOrThrow: jest.fn().mockResolvedValue({ ...cart, coupon: null, voucher: null }),
         findUnique: jest.fn(),
         delete: jest.fn(),
       },
@@ -263,6 +265,58 @@ describe('CartService', () => {
     });
   });
 
+  describe('redeemVoucher', () => {
+    it('throws NotFoundException when the code does not exist', async () => {
+      prisma.giftVoucher.findUnique.mockResolvedValue(null);
+
+      await expect(service.redeemVoucher({ sessionId: 's1' }, 'MISSING')).rejects.toThrow(
+        NotFoundException,
+      );
+    });
+
+    it('throws BadRequestException when the voucher balance is exhausted', async () => {
+      prisma.giftVoucher.findUnique.mockResolvedValue({
+        id: 'v1',
+        code: 'GIFT10',
+        isActive: true,
+        expiresAt: null,
+        balance: 0,
+      });
+
+      await expect(service.redeemVoucher({ sessionId: 's1' }, 'GIFT10')).rejects.toThrow(
+        BadRequestException,
+      );
+    });
+
+    it('applies the voucher to the cart when usable', async () => {
+      prisma.giftVoucher.findUnique.mockResolvedValue({
+        id: 'v1',
+        code: 'GIFT10',
+        isActive: true,
+        expiresAt: null,
+        balance: 50_000,
+      });
+
+      await service.redeemVoucher({ sessionId: 's1' }, 'GIFT10');
+
+      expect(prisma.cart.update).toHaveBeenCalledWith({
+        where: { id: 'cart-1' },
+        data: { voucherId: 'v1' },
+      });
+    });
+  });
+
+  describe('removeVoucher', () => {
+    it('clears the voucher from the cart', async () => {
+      await service.removeVoucher({ sessionId: 's1' });
+
+      expect(prisma.cart.update).toHaveBeenCalledWith({
+        where: { id: 'cart-1' },
+        data: { voucherId: null },
+      });
+    });
+  });
+
   describe('getCart with promotions', () => {
     function cartItemRow(overrides: Record<string, unknown> = {}) {
       return {
@@ -335,6 +389,22 @@ describe('CartService', () => {
       ]);
       expect(result.total).toBe(150_000);
     });
+
+    it('caps the voucher discount at the remaining balance and deducts it from the total', async () => {
+      prisma.cartItem.findMany.mockResolvedValue([cartItemRow()]);
+      prisma.cart.findUniqueOrThrow.mockResolvedValue({
+        ...cart,
+        coupon: null,
+        voucher: { id: 'v1', code: 'GIFT10', isActive: true, expiresAt: null, balance: 30_000 },
+      });
+
+      const result = await service.getCart({ sessionId: 's1' });
+
+      expect(result.subtotal).toBe(200_000);
+      expect(result.voucherCode).toBe('GIFT10');
+      expect(result.voucherDiscountTotal).toBe(30_000);
+      expect(result.total).toBe(170_000);
+    });
   });
 
   describe('mergeGuestCartIntoUserCart', () => {
@@ -387,9 +457,10 @@ describe('CartService', () => {
       prisma.cart.findUnique.mockResolvedValue({
         id: 'guest-cart',
         couponId: 'coupon-1',
+        voucherId: null,
         items: [{ id: 'gi-1', productId: 'p1', variantId: null, quantity: 1 }],
       });
-      prisma.cart.upsert.mockResolvedValue({ id: 'user-cart', couponId: null, items: [] });
+      prisma.cart.upsert.mockResolvedValue({ id: 'user-cart', couponId: null, voucherId: null, items: [] });
 
       await service.mergeGuestCartIntoUserCart('user-1', 'session-1');
 
@@ -403,9 +474,51 @@ describe('CartService', () => {
       prisma.cart.findUnique.mockResolvedValue({
         id: 'guest-cart',
         couponId: 'coupon-guest',
+        voucherId: null,
         items: [{ id: 'gi-1', productId: 'p1', variantId: null, quantity: 1 }],
       });
-      prisma.cart.upsert.mockResolvedValue({ id: 'user-cart', couponId: 'coupon-user', items: [] });
+      prisma.cart.upsert.mockResolvedValue({
+        id: 'user-cart',
+        couponId: 'coupon-user',
+        voucherId: null,
+        items: [],
+      });
+
+      await service.mergeGuestCartIntoUserCart('user-1', 'session-1');
+
+      expect(prisma.cart.update).not.toHaveBeenCalled();
+    });
+
+    it('carries the guest cart voucher over only when the user cart has none', async () => {
+      prisma.cart.findUnique.mockResolvedValue({
+        id: 'guest-cart',
+        couponId: null,
+        voucherId: 'voucher-1',
+        items: [{ id: 'gi-1', productId: 'p1', variantId: null, quantity: 1 }],
+      });
+      prisma.cart.upsert.mockResolvedValue({ id: 'user-cart', couponId: null, voucherId: null, items: [] });
+
+      await service.mergeGuestCartIntoUserCart('user-1', 'session-1');
+
+      expect(prisma.cart.update).toHaveBeenCalledWith({
+        where: { id: 'user-cart' },
+        data: { voucherId: 'voucher-1' },
+      });
+    });
+
+    it('keeps the user cart voucher when it already has one', async () => {
+      prisma.cart.findUnique.mockResolvedValue({
+        id: 'guest-cart',
+        couponId: null,
+        voucherId: 'voucher-guest',
+        items: [{ id: 'gi-1', productId: 'p1', variantId: null, quantity: 1 }],
+      });
+      prisma.cart.upsert.mockResolvedValue({
+        id: 'user-cart',
+        couponId: null,
+        voucherId: 'voucher-user',
+        items: [],
+      });
 
       await service.mergeGuestCartIntoUserCart('user-1', 'session-1');
 

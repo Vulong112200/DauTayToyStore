@@ -1,7 +1,12 @@
 'use client';
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import type { AddCartItemInput, ApplyCartCouponInput, UpdateCartItemInput } from '@repo/contracts';
+import type {
+  AddCartItemInput,
+  ApplyCartCouponInput,
+  RedeemGiftVoucherInput,
+  UpdateCartItemInput,
+} from '@repo/contracts';
 import { cartApi } from '@/lib/api/cart';
 
 export const CART_QUERY_KEY = ['cart'] as const;
@@ -47,6 +52,22 @@ export function useRemoveCoupon() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: () => cartApi.removeCoupon(),
+    onSuccess: (data) => queryClient.setQueryData(CART_QUERY_KEY, data),
+  });
+}
+
+export function useRedeemVoucher() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: RedeemGiftVoucherInput) => cartApi.redeemVoucher(input),
+    onSuccess: (data) => queryClient.setQueryData(CART_QUERY_KEY, data),
+  });
+}
+
+export function useRemoveVoucher() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () => cartApi.removeVoucher(),
     onSuccess: (data) => queryClient.setQueryData(CART_QUERY_KEY, data),
   });
 }

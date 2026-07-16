@@ -17,6 +17,7 @@ describe('OrdersService', () => {
     cart: { findFirst: jest.Mock; update: jest.Mock };
     order: { create: jest.Mock; findMany: jest.Mock; findFirst: jest.Mock; count: jest.Mock };
     coupon: { update: jest.Mock };
+    giftVoucher: { findUnique: jest.Mock; update: jest.Mock };
     inventory: { updateMany: jest.Mock };
     cartItem: { deleteMany: jest.Mock };
     flashSaleItem: { findFirst: jest.Mock; update: jest.Mock };
@@ -58,6 +59,7 @@ describe('OrdersService', () => {
       cart: { findFirst: jest.fn(), update: jest.fn() },
       order: { create: jest.fn(), findMany: jest.fn(), findFirst: jest.fn(), count: jest.fn() },
       coupon: { update: jest.fn() },
+      giftVoucher: { findUnique: jest.fn(), update: jest.fn() },
       inventory: { updateMany: jest.fn() },
       cartItem: { deleteMany: jest.fn() },
       flashSaleItem: { findFirst: jest.fn(), update: jest.fn() },
@@ -65,6 +67,7 @@ describe('OrdersService', () => {
         callback({
           order: { create: prisma.order.create },
           coupon: { update: prisma.coupon.update },
+          giftVoucher: { findUnique: prisma.giftVoucher.findUnique, update: prisma.giftVoucher.update },
           inventory: { updateMany: prisma.inventory.updateMany },
           cartItem: { deleteMany: prisma.cartItem.deleteMany },
           cart: { update: prisma.cart.update },
@@ -267,7 +270,7 @@ describe('OrdersService', () => {
       });
       expect(prisma.cart.update).toHaveBeenCalledWith({
         where: { id: 'cart-1' },
-        data: { couponId: null },
+        data: { couponId: null, voucherId: null },
       });
     });
 
@@ -352,6 +355,87 @@ describe('OrdersService', () => {
         id: 'fsi-1',
         stockLimit: 10,
         soldCount: 9, // only 1 left, but the order wants 2
+      });
+
+      await expect(service.checkout({ sessionId: 's1' }, checkoutInput)).rejects.toThrow(
+        BadRequestException,
+      );
+      expect(prisma.order.create).not.toHaveBeenCalled();
+    });
+
+    it('deducts a gift voucher balance from the total and decrements it inside the transaction', async () => {
+      prisma.cart.findFirst.mockResolvedValue({
+        ...cartWithItems([publishedItem()]),
+        coupon: null,
+        voucher: { id: 'v1', code: 'GIFT10', isActive: true, expiresAt: null, balance: 50_000 },
+      });
+      prisma.giftVoucher.findUnique.mockResolvedValue({
+        id: 'v1',
+        code: 'GIFT10',
+        isActive: true,
+        expiresAt: null,
+        balance: 50_000,
+        redeemedAt: null,
+      });
+      prisma.order.create.mockResolvedValue({
+        id: 'order-5',
+        orderNumber: 'DTT00000005',
+        status: 'PENDING',
+        subtotal: 200000,
+        discountTotal: 0,
+        giftVoucherId: 'v1',
+        giftVoucherAmount: 50_000,
+        shippingFee: 30000,
+        total: 180000,
+        customerName: checkoutInput.customerName,
+        customerEmail: checkoutInput.customerEmail,
+        customerPhone: checkoutInput.customerPhone,
+        shippingLine1: checkoutInput.shippingLine1,
+        shippingLine2: null,
+        shippingWard: null,
+        shippingDistrict: null,
+        shippingProvince: checkoutInput.shippingProvince,
+        shippingPostalCode: null,
+        note: null,
+        createdAt: new Date('2026-01-01'),
+        items: [],
+        statusHistory: [],
+      });
+
+      await service.checkout({ sessionId: 's1' }, checkoutInput);
+
+      expect(prisma.order.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            giftVoucherId: 'v1',
+            giftVoucherAmount: 50_000,
+            total: 180000,
+          }),
+        }),
+      );
+      expect(prisma.giftVoucher.update).toHaveBeenCalledWith({
+        where: { id: 'v1' },
+        data: { balance: 0, redeemedAt: expect.any(Date) },
+      });
+      expect(prisma.cart.update).toHaveBeenCalledWith({
+        where: { id: 'cart-1' },
+        data: { couponId: null, voucherId: null },
+      });
+    });
+
+    it('rejects checkout when the voucher balance was spent elsewhere before the transaction ran', async () => {
+      prisma.cart.findFirst.mockResolvedValue({
+        ...cartWithItems([publishedItem()]),
+        coupon: null,
+        voucher: { id: 'v1', code: 'GIFT10', isActive: true, expiresAt: null, balance: 50_000 },
+      });
+      prisma.giftVoucher.findUnique.mockResolvedValue({
+        id: 'v1',
+        code: 'GIFT10',
+        isActive: true,
+        expiresAt: null,
+        balance: 10_000, // spent down to 10_000 since the cart-level check saw 50_000
+        redeemedAt: null,
       });
 
       await expect(service.checkout({ sessionId: 's1' }, checkoutInput)).rejects.toThrow(

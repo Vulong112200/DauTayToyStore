@@ -59,6 +59,7 @@ export const orderViewSchema = z.object({
   status: orderStatusSchema,
   subtotal: z.number().int(),
   discountTotal: z.number().int(),
+  giftVoucherAmount: z.number().int(),
   shippingFee: z.number().int(),
   total: z.number().int(),
   customerName: z.string(),

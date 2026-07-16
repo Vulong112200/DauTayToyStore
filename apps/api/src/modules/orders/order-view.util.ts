@@ -18,6 +18,7 @@ export function toOrderView(order: OrderViewRow): OrderView {
     status: order.status,
     subtotal: order.subtotal,
     discountTotal: order.discountTotal,
+    giftVoucherAmount: order.giftVoucherAmount,
     shippingFee: order.shippingFee,
     total: order.total,
     customerName: order.customerName,

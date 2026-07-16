@@ -8,6 +8,7 @@ import {
   assertCouponUserUsable,
   computeCouponDiscount,
 } from '../../common/utils/coupon.util';
+import { assertVoucherUsable, computeVoucherDiscount } from '../../common/utils/gift-voucher.util';
 import { resolveAvailableStock } from '../../common/utils/inventory.util';
 import { resolveFreeShipping, runPromotionEngine } from '../../common/utils/promotion-engine.util';
 import { PrismaService } from '../../infra/prisma/prisma.service';
@@ -48,7 +49,7 @@ export class OrdersService {
   async checkout(identity: CartIdentity, input: CheckoutInput): Promise<OrderView> {
     const cart = await this.prisma.cart.findFirst({
       where: identity.userId ? { userId: identity.userId } : { sessionId: identity.sessionId },
-      include: { items: { include: CART_ITEM_INCLUDE }, coupon: true },
+      include: { items: { include: CART_ITEM_INCLUDE }, coupon: true, voucher: true },
     });
 
     if (!cart || cart.items.length === 0) {
@@ -128,6 +129,16 @@ export class OrdersService {
 
     const discountTotal = engineResult.promotionDiscountTotal + couponDiscount;
     const netSubtotalAfterCoupon = engineResult.netSubtotal - couponDiscount;
+
+    // Voucher is store credit, not a price discount — it's applied after the free-shipping
+    // threshold check (based on netSubtotalAfterCoupon) so it can't be used to game free
+    // shipping, and it never covers the shipping fee itself.
+    let voucherAmount = 0;
+    if (cart.voucher) {
+      assertVoucherUsable(cart.voucher);
+      voucherAmount = computeVoucherDiscount(cart.voucher, netSubtotalAfterCoupon);
+    }
+
     const isFreeShipping = resolveFreeShipping(
       netSubtotalAfterCoupon,
       input.shippingProvince,
@@ -135,7 +146,7 @@ export class OrdersService {
       freeShippingRules,
     );
     const shippingFee = isFreeShipping ? 0 : settings.flatShippingFee;
-    const total = netSubtotalAfterCoupon + shippingFee;
+    const total = netSubtotalAfterCoupon - voucherAmount + shippingFee;
 
     const order = await this.prisma.$transaction(async (tx) => {
       // Guard flash-sale stock again inside the transaction against a last-instant race —
@@ -166,6 +177,27 @@ export class OrdersService {
         });
       }
 
+      // Re-check the voucher's balance inside the transaction against a last-instant race
+      // (same tradeoff as flash-sale stock above) — someone else may have spent it since.
+      if (cart.voucher) {
+        const voucher = await tx.giftVoucher.findUnique({ where: { id: cart.voucher.id } });
+        if (!voucher) {
+          throw new BadRequestException('Phiếu quà tặng không còn tồn tại');
+        }
+        assertVoucherUsable(voucher);
+        if (voucher.balance < voucherAmount) {
+          throw new BadRequestException('Số dư phiếu quà tặng không còn đủ, vui lòng thử lại');
+        }
+        const remainingBalance = voucher.balance - voucherAmount;
+        await tx.giftVoucher.update({
+          where: { id: voucher.id },
+          data: {
+            balance: remainingBalance,
+            redeemedAt: remainingBalance === 0 ? new Date() : voucher.redeemedAt,
+          },
+        });
+      }
+
       const created = await tx.order.create({
         data: {
           orderNumber: generateOrderNumber(),
@@ -173,6 +205,8 @@ export class OrdersService {
           status: 'PENDING',
           subtotal,
           discountTotal,
+          giftVoucherId: cart.voucher?.id,
+          giftVoucherAmount: voucherAmount,
           shippingFee,
           total,
           couponId: cart.coupon?.id,
@@ -215,7 +249,7 @@ export class OrdersService {
       }
 
       await tx.cartItem.deleteMany({ where: { cartId: cart.id } });
-      await tx.cart.update({ where: { id: cart.id }, data: { couponId: null } });
+      await tx.cart.update({ where: { id: cart.id }, data: { couponId: null, voucherId: null } });
 
       return created;
     });
