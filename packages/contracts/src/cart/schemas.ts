@@ -15,11 +15,22 @@ export const cartItemViewSchema = z.object({
 });
 export type CartItemView = z.infer<typeof cartItemViewSchema>;
 
+export const appliedPromotionSchema = z.object({
+  type: z.enum(['COMBO', 'BUY_X_GET_Y']),
+  id: z.string().uuid(),
+  label: z.string(),
+  discountAmount: z.number().int(),
+  timesApplied: z.number().int(),
+});
+export type AppliedPromotion = z.infer<typeof appliedPromotionSchema>;
+
 export const cartViewSchema = z.object({
   id: z.string().uuid(),
   items: z.array(cartItemViewSchema),
   subtotal: z.number().int(),
   itemCount: z.number().int(),
+  promotionDiscountTotal: z.number().int(),
+  appliedPromotions: z.array(appliedPromotionSchema),
   couponCode: z.string().nullable(),
   discountTotal: z.number().int(),
   total: z.number().int(),

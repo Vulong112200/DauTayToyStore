@@ -141,6 +141,22 @@ export function CartView() {
           <span className="font-medium">{formatVnd(cart.subtotal)}</span>
         </div>
 
+        {cart.appliedPromotions.length > 0 && (
+          <div className="mt-2 space-y-1">
+            {cart.appliedPromotions.map((promo) => (
+              <div key={promo.id} className="flex justify-between text-sm">
+                <span className="text-muted-foreground">
+                  🎁 {promo.label}
+                  {promo.timesApplied > 1 ? ` ×${promo.timesApplied}` : ''}
+                </span>
+                <span className="font-medium text-destructive">
+                  -{formatVnd(promo.discountAmount)}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
+
         {cart.couponCode ? (
           <div className="mt-2 flex items-center justify-between text-sm">
             <span className="text-muted-foreground">

@@ -2,12 +2,14 @@ import { BadRequestException, Injectable, NotFoundException } from '@nestjs/comm
 import { Prisma } from '@prisma/client';
 import type { AddCartItemInput, CartItemView, CartView } from '@repo/contracts';
 import { CartIdentity } from '../../common/cart-identity/cart-identity';
+import { PromotionContextService } from '../../common/promotion-context/promotion-context.service';
 import {
   assertCouponGloballyUsable,
   assertCouponUserUsable,
   computeCouponDiscount,
 } from '../../common/utils/coupon.util';
 import { resolveAvailableStock } from '../../common/utils/inventory.util';
+import { PromotionEngineResult, runPromotionEngine } from '../../common/utils/promotion-engine.util';
 import { PrismaService } from '../../infra/prisma/prisma.service';
 
 const ITEM_INCLUDE = {
@@ -32,30 +34,12 @@ const ITEM_INCLUDE = {
 
 type CartItemRow = Prisma.CartItemGetPayload<{ include: typeof ITEM_INCLUDE }>;
 
-function toItemView(item: CartItemRow): CartItemView {
-  const unitPrice = item.variant?.priceOverride ?? item.product.price;
-  const availableStock = item.variant
-    ? resolveAvailableStock(item.variant.inventory)
-    : resolveAvailableStock(item.product.inventory);
-
-  return {
-    id: item.id,
-    productId: item.productId,
-    variantId: item.variantId,
-    productName: item.product.name,
-    productSlug: item.product.slug,
-    variantName: item.variant?.name ?? null,
-    imageUrl: item.variant?.imageUrl ?? item.product.images[0]?.url ?? null,
-    unitPrice,
-    quantity: item.quantity,
-    lineTotal: unitPrice * item.quantity,
-    availableStock,
-  };
-}
-
 @Injectable()
 export class CartService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly promotionContext: PromotionContextService,
+  ) {}
 
   async getCart(identity: CartIdentity): Promise<CartView> {
     const cart = await this.getOrCreateCart(identity);
@@ -89,6 +73,8 @@ export class CartService {
       }
 
       availableStock = resolveAvailableStock(variant.inventory);
+    } else {
+      availableStock = await this.capByFlashStock(product.id, availableStock);
     }
 
     const cart = await this.getOrCreateCart(identity);
@@ -136,9 +122,13 @@ export class CartService {
       throw new NotFoundException('Không tìm thấy sản phẩm trong giỏ hàng');
     }
 
-    const availableStock = item.variant
+    let availableStock = item.variant
       ? resolveAvailableStock(item.variant.inventory)
       : resolveAvailableStock(item.product.inventory);
+
+    if (!item.variantId) {
+      availableStock = await this.capByFlashStock(item.productId, availableStock);
+    }
 
     if (quantity > availableStock) {
       throw new BadRequestException('Số lượng vượt quá hàng có sẵn trong kho');
@@ -170,8 +160,8 @@ export class CartService {
       throw new NotFoundException('Mã giảm giá không tồn tại');
     }
 
-    const { subtotal } = await this.getItemViews(cart.id);
-    assertCouponGloballyUsable(coupon, subtotal);
+    const { engineResult } = await this.loadCartContext(cart.id);
+    assertCouponGloballyUsable(coupon, engineResult.netSubtotal);
 
     if (identity.userId) {
       const usedByUserCount = await this.prisma.order.count({
@@ -213,18 +203,38 @@ export class CartService {
     throw new BadRequestException('Thiếu thông tin định danh giỏ hàng');
   }
 
-  private async getItemViews(
+  private async capByFlashStock(productId: string, inventoryStock: number): Promise<number> {
+    const [flash] = await this.promotionContext.loadFlashSaleItems([productId]);
+    if (!flash || flash.remainingStock === null) return inventoryStock;
+    return Math.min(inventoryStock, Math.max(0, flash.remainingStock));
+  }
+
+  private async loadCartContext(
     cartId: string,
-  ): Promise<{ views: CartItemView[]; subtotal: number }> {
+  ): Promise<{ items: CartItemRow[]; engineResult: PromotionEngineResult }> {
     const items = await this.prisma.cartItem.findMany({
       where: { cartId },
       orderBy: { createdAt: 'asc' },
       include: ITEM_INCLUDE,
     });
 
-    const views = items.map(toItemView);
+    const productIds = [...new Set(items.map((item) => item.productId))];
+    const [flashSaleItems, comboDeals, buyXGetYRules] = await Promise.all([
+      this.promotionContext.loadFlashSaleItems(productIds),
+      this.promotionContext.loadComboDeals(),
+      this.promotionContext.loadBuyXGetYRules(),
+    ]);
 
-    return { views, subtotal: views.reduce((sum, item) => sum + item.lineTotal, 0) };
+    const cartLines = items.map((item) => ({
+      productId: item.productId,
+      variantId: item.variantId,
+      quantity: item.quantity,
+      basePrice: item.variant?.priceOverride ?? item.product.price,
+    }));
+
+    const engineResult = runPromotionEngine(cartLines, flashSaleItems, comboDeals, buyXGetYRules);
+
+    return { items, engineResult };
   }
 
   private async loadCartView(cartId: string): Promise<CartView> {
@@ -232,7 +242,32 @@ export class CartService {
       where: { id: cartId },
       include: { coupon: true },
     });
-    const { views, subtotal } = await this.getItemViews(cartId);
+    const { items, engineResult } = await this.loadCartContext(cartId);
+
+    const views: CartItemView[] = items.map((item, index) => {
+      const lineResult = engineResult.lines[index]!;
+      const inventoryStock = item.variant
+        ? resolveAvailableStock(item.variant.inventory)
+        : resolveAvailableStock(item.product.inventory);
+      const availableStock =
+        lineResult.flashRemainingStock !== null
+          ? Math.min(inventoryStock, lineResult.flashRemainingStock)
+          : inventoryStock;
+
+      return {
+        id: item.id,
+        productId: item.productId,
+        variantId: item.variantId,
+        productName: item.product.name,
+        productSlug: item.product.slug,
+        variantName: item.variant?.name ?? null,
+        imageUrl: item.variant?.imageUrl ?? item.product.images[0]?.url ?? null,
+        unitPrice: lineResult.unitPrice,
+        quantity: item.quantity,
+        lineTotal: lineResult.lineTotal,
+        availableStock,
+      };
+    });
 
     // Recomputed on every read rather than cached: if the cart contents shrink
     // below the coupon's minOrderAmount (or the coupon's window/usage limit lapses)
@@ -241,8 +276,8 @@ export class CartService {
     let discountTotal = 0;
     if (cart.coupon) {
       try {
-        assertCouponGloballyUsable(cart.coupon, subtotal);
-        discountTotal = computeCouponDiscount(cart.coupon, subtotal);
+        assertCouponGloballyUsable(cart.coupon, engineResult.netSubtotal);
+        discountTotal = computeCouponDiscount(cart.coupon, engineResult.netSubtotal);
       } catch {
         discountTotal = 0;
       }
@@ -251,11 +286,13 @@ export class CartService {
     return {
       id: cartId,
       items: views,
-      subtotal,
+      subtotal: engineResult.subtotal,
       itemCount: views.reduce((sum, item) => sum + item.quantity, 0),
+      promotionDiscountTotal: engineResult.promotionDiscountTotal,
+      appliedPromotions: engineResult.appliedPromotions,
       couponCode: cart.coupon?.code ?? null,
       discountTotal,
-      total: subtotal - discountTotal,
+      total: engineResult.netSubtotal - discountTotal,
     };
   }
 }

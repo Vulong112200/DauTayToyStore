@@ -1,9 +1,15 @@
 import { BadRequestException, NotFoundException } from '@nestjs/common';
+import { PromotionContextService } from '../../common/promotion-context/promotion-context.service';
 import { PrismaService } from '../../infra/prisma/prisma.service';
 import { CartService } from './cart.service';
 
 describe('CartService', () => {
   let service: CartService;
+  let promotionContext: {
+    loadFlashSaleItems: jest.Mock;
+    loadComboDeals: jest.Mock;
+    loadBuyXGetYRules: jest.Mock;
+  };
   let prisma: {
     product: { findUnique: jest.Mock };
     productVariant: { findUnique: jest.Mock };
@@ -40,7 +46,15 @@ describe('CartService', () => {
         deleteMany: jest.fn(),
       },
     };
-    service = new CartService(prisma as unknown as PrismaService);
+    promotionContext = {
+      loadFlashSaleItems: jest.fn().mockResolvedValue([]),
+      loadComboDeals: jest.fn().mockResolvedValue([]),
+      loadBuyXGetYRules: jest.fn().mockResolvedValue([]),
+    };
+    service = new CartService(
+      prisma as unknown as PrismaService,
+      promotionContext as unknown as PromotionContextService,
+    );
   });
 
   describe('getOrCreateCart identity resolution', () => {
@@ -231,6 +245,80 @@ describe('CartService', () => {
         where: { id: 'cart-1' },
         data: { couponId: null },
       });
+    });
+  });
+
+  describe('getCart with promotions', () => {
+    function cartItemRow(overrides: Record<string, unknown> = {}) {
+      return {
+        id: 'item-1',
+        productId: 'p1',
+        variantId: null,
+        quantity: 2,
+        product: {
+          name: 'LEGO City',
+          slug: 'lego-city',
+          price: 100_000,
+          images: [{ url: 'https://example.com/p1.jpg' }],
+          inventory: { quantityOnHand: 10, quantityReserved: 0 },
+        },
+        variant: null,
+        ...overrides,
+      };
+    }
+
+    it('overrides the unit price and caps availableStock with an active flash sale', async () => {
+      prisma.cartItem.findMany.mockResolvedValue([cartItemRow()]);
+      promotionContext.loadFlashSaleItems.mockResolvedValue([
+        { productId: 'p1', salePrice: 70_000, remainingStock: 5 },
+      ]);
+
+      const result = await service.getCart({ sessionId: 's1' });
+
+      expect(result.items[0]).toMatchObject({
+        unitPrice: 70_000,
+        lineTotal: 140_000,
+        availableStock: 5,
+      });
+      expect(result.subtotal).toBe(140_000);
+    });
+
+    it('reflects a combo discount in promotionDiscountTotal and appliedPromotions', async () => {
+      prisma.cartItem.findMany.mockResolvedValue([
+        cartItemRow({ id: 'item-1', productId: 'p1', quantity: 1 }),
+        cartItemRow({
+          id: 'item-2',
+          productId: 'p2',
+          quantity: 1,
+          product: {
+            name: 'LEGO Star',
+            slug: 'lego-star',
+            price: 80_000,
+            images: [],
+            inventory: { quantityOnHand: 10, quantityReserved: 0 },
+          },
+        }),
+      ]);
+      promotionContext.loadComboDeals.mockResolvedValue([
+        {
+          id: 'combo-1',
+          name: 'Combo A+B',
+          comboPrice: 150_000,
+          items: [
+            { productId: 'p1', quantity: 1 },
+            { productId: 'p2', quantity: 1 },
+          ],
+        },
+      ]);
+
+      const result = await service.getCart({ sessionId: 's1' });
+
+      expect(result.subtotal).toBe(180_000);
+      expect(result.promotionDiscountTotal).toBe(30_000);
+      expect(result.appliedPromotions).toEqual([
+        { type: 'COMBO', id: 'combo-1', label: 'Combo A+B', discountAmount: 30_000, timesApplied: 1 },
+      ]);
+      expect(result.total).toBe(150_000);
     });
   });
 });

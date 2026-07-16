@@ -1,4 +1,5 @@
 import { BadRequestException, NotFoundException } from '@nestjs/common';
+import { PromotionContextService } from '../../common/promotion-context/promotion-context.service';
 import { PrismaService } from '../../infra/prisma/prisma.service';
 import { AdminSettingsService } from '../settings/admin-settings.service';
 import { OrdersService } from './orders.service';
@@ -6,12 +7,19 @@ import { OrdersService } from './orders.service';
 describe('OrdersService', () => {
   let service: OrdersService;
   let adminSettingsService: { getSettings: jest.Mock };
+  let promotionContext: {
+    loadFlashSaleItems: jest.Mock;
+    loadComboDeals: jest.Mock;
+    loadBuyXGetYRules: jest.Mock;
+    loadFreeShippingRules: jest.Mock;
+  };
   let prisma: {
     cart: { findFirst: jest.Mock; update: jest.Mock };
     order: { create: jest.Mock; findMany: jest.Mock; findFirst: jest.Mock; count: jest.Mock };
     coupon: { update: jest.Mock };
     inventory: { updateMany: jest.Mock };
     cartItem: { deleteMany: jest.Mock };
+    flashSaleItem: { findFirst: jest.Mock; update: jest.Mock };
     $transaction: jest.Mock;
   };
 
@@ -52,6 +60,7 @@ describe('OrdersService', () => {
       coupon: { update: jest.fn() },
       inventory: { updateMany: jest.fn() },
       cartItem: { deleteMany: jest.fn() },
+      flashSaleItem: { findFirst: jest.fn(), update: jest.fn() },
       $transaction: jest.fn(async (callback: (tx: unknown) => unknown) =>
         callback({
           order: { create: prisma.order.create },
@@ -59,6 +68,7 @@ describe('OrdersService', () => {
           inventory: { updateMany: prisma.inventory.updateMany },
           cartItem: { deleteMany: prisma.cartItem.deleteMany },
           cart: { update: prisma.cart.update },
+          flashSaleItem: { findFirst: prisma.flashSaleItem.findFirst, update: prisma.flashSaleItem.update },
         }),
       ),
     };
@@ -69,9 +79,16 @@ describe('OrdersService', () => {
         flatShippingFee: 30_000,
       }),
     };
+    promotionContext = {
+      loadFlashSaleItems: jest.fn().mockResolvedValue([]),
+      loadComboDeals: jest.fn().mockResolvedValue([]),
+      loadBuyXGetYRules: jest.fn().mockResolvedValue([]),
+      loadFreeShippingRules: jest.fn().mockResolvedValue([]),
+    };
     service = new OrdersService(
       prisma as unknown as PrismaService,
       adminSettingsService as unknown as AdminSettingsService,
+      promotionContext as unknown as PromotionContextService,
     );
   });
 
@@ -275,6 +292,72 @@ describe('OrdersService', () => {
       await expect(service.checkout({ sessionId: 's1' }, checkoutInput)).rejects.toThrow(
         BadRequestException,
       );
+    });
+
+    it('charges the flash-sale price and increments soldCount', async () => {
+      prisma.cart.findFirst.mockResolvedValue(cartWithItems([publishedItem({ quantity: 2 })]));
+      promotionContext.loadFlashSaleItems.mockResolvedValue([
+        { productId: 'p1', salePrice: 70_000, remainingStock: 5 },
+      ]);
+      prisma.flashSaleItem.findFirst.mockResolvedValue({
+        id: 'fsi-1',
+        stockLimit: 10,
+        soldCount: 3,
+      });
+      prisma.order.create.mockResolvedValue({
+        id: 'order-4',
+        orderNumber: 'DTT00000004',
+        status: 'PENDING',
+        subtotal: 140_000,
+        discountTotal: 0,
+        shippingFee: 30_000,
+        total: 170_000,
+        customerName: checkoutInput.customerName,
+        customerEmail: checkoutInput.customerEmail,
+        customerPhone: checkoutInput.customerPhone,
+        shippingLine1: checkoutInput.shippingLine1,
+        shippingLine2: null,
+        shippingWard: null,
+        shippingDistrict: null,
+        shippingProvince: checkoutInput.shippingProvince,
+        shippingPostalCode: null,
+        note: null,
+        createdAt: new Date('2026-01-01'),
+        items: [],
+        statusHistory: [],
+      });
+
+      await service.checkout({ sessionId: 's1' }, checkoutInput);
+
+      expect(prisma.order.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ subtotal: 140_000 }),
+          include: expect.anything(),
+        }),
+      );
+      const [createArgs] = prisma.order.create.mock.calls[0];
+      expect(createArgs.data.items.create[0]).toMatchObject({ unitPrice: 70_000, lineTotal: 140_000 });
+      expect(prisma.flashSaleItem.update).toHaveBeenCalledWith({
+        where: { id: 'fsi-1' },
+        data: { soldCount: { increment: 2 } },
+      });
+    });
+
+    it('rejects checkout when flash-sale stock ran out between preview and checkout', async () => {
+      prisma.cart.findFirst.mockResolvedValue(cartWithItems([publishedItem({ quantity: 2 })]));
+      promotionContext.loadFlashSaleItems.mockResolvedValue([
+        { productId: 'p1', salePrice: 70_000, remainingStock: 5 },
+      ]);
+      prisma.flashSaleItem.findFirst.mockResolvedValue({
+        id: 'fsi-1',
+        stockLimit: 10,
+        soldCount: 9, // only 1 left, but the order wants 2
+      });
+
+      await expect(service.checkout({ sessionId: 's1' }, checkoutInput)).rejects.toThrow(
+        BadRequestException,
+      );
+      expect(prisma.order.create).not.toHaveBeenCalled();
     });
   });
 

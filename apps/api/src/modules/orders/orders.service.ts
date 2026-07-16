@@ -2,12 +2,14 @@ import { BadRequestException, Injectable, NotFoundException } from '@nestjs/comm
 import { Prisma } from '@prisma/client';
 import type { CheckoutInput, OrderListItem, OrderView } from '@repo/contracts';
 import { CartIdentity } from '../../common/cart-identity/cart-identity';
+import { PromotionContextService } from '../../common/promotion-context/promotion-context.service';
 import {
   assertCouponGloballyUsable,
   assertCouponUserUsable,
   computeCouponDiscount,
 } from '../../common/utils/coupon.util';
 import { resolveAvailableStock } from '../../common/utils/inventory.util';
+import { resolveFreeShipping, runPromotionEngine } from '../../common/utils/promotion-engine.util';
 import { PrismaService } from '../../infra/prisma/prisma.service';
 import { AdminSettingsService } from '../settings/admin-settings.service';
 import { ORDER_VIEW_INCLUDE, toOrderView } from './order-view.util';
@@ -40,6 +42,7 @@ export class OrdersService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly adminSettingsService: AdminSettingsService,
+    private readonly promotionContext: PromotionContextService,
   ) {}
 
   async checkout(identity: CartIdentity, input: CheckoutInput): Promise<OrderView> {
@@ -64,40 +67,105 @@ export class OrdersService {
       }
     }
 
-    const lines = cart.items.map((item) => {
-      const unitPrice = item.variant?.priceOverride ?? item.product.price;
+    const productIds = [...new Set(cart.items.map((item) => item.productId))];
+    const [flashSaleItems, comboDeals, buyXGetYRules, freeShippingRules, settings] =
+      await Promise.all([
+        this.promotionContext.loadFlashSaleItems(productIds),
+        this.promotionContext.loadComboDeals(),
+        this.promotionContext.loadBuyXGetYRules(),
+        this.promotionContext.loadFreeShippingRules(),
+        this.adminSettingsService.getSettings(),
+      ]);
+
+    const cartLines = cart.items.map((item) => ({
+      productId: item.productId,
+      variantId: item.variantId,
+      quantity: item.quantity,
+      basePrice: item.variant?.priceOverride ?? item.product.price,
+    }));
+
+    const engineResult = runPromotionEngine(cartLines, flashSaleItems, comboDeals, buyXGetYRules);
+
+    // Flash sale stock can only be soft-guaranteed at cart-preview time — re-check here in case
+    // it sold out (to someone else) between adding to cart and checking out.
+    for (const line of engineResult.lines) {
+      if (line.flashApplied && line.flashRemainingStock !== null && line.quantity > line.flashRemainingStock) {
+        const productName = cart.items.find((item) => item.productId === line.productId)?.product.name;
+        throw new BadRequestException(
+          `Số lượng giảm giá sốc cho "${productName}" không còn đủ, vui lòng giảm số lượng trong giỏ hàng`,
+        );
+      }
+    }
+
+    const lines = cart.items.map((item, index) => {
+      const lineResult = engineResult.lines[index]!;
       return {
         productId: item.productId,
         variantId: item.variantId,
         productName: item.product.name,
         sku: item.variant?.sku ?? item.product.sku,
-        unitPrice,
+        unitPrice: lineResult.unitPrice,
         quantity: item.quantity,
-        lineTotal: unitPrice * item.quantity,
+        lineTotal: lineResult.lineTotal,
       };
     });
 
-    const subtotal = lines.reduce((sum, line) => sum + line.lineTotal, 0);
-    const { freeShippingThreshold, flatShippingFee } = await this.adminSettingsService.getSettings();
-    const shippingFee = subtotal >= freeShippingThreshold ? 0 : flatShippingFee;
+    const subtotal = engineResult.subtotal;
 
-    let discountTotal = 0;
+    let couponDiscount = 0;
     if (cart.coupon) {
       // Re-validate rather than trust what CartService checked at apply-time — the
       // cart contents, the coupon's window, or its usage limit may have changed since.
-      assertCouponGloballyUsable(cart.coupon, subtotal);
+      assertCouponGloballyUsable(cart.coupon, engineResult.netSubtotal);
       if (identity.userId) {
         const usedByUserCount = await this.prisma.order.count({
           where: { couponId: cart.coupon.id, userId: identity.userId },
         });
         assertCouponUserUsable(cart.coupon, usedByUserCount);
       }
-      discountTotal = computeCouponDiscount(cart.coupon, subtotal);
+      couponDiscount = computeCouponDiscount(cart.coupon, engineResult.netSubtotal);
     }
 
-    const total = subtotal + shippingFee - discountTotal;
+    const discountTotal = engineResult.promotionDiscountTotal + couponDiscount;
+    const netSubtotalAfterCoupon = engineResult.netSubtotal - couponDiscount;
+    const isFreeShipping = resolveFreeShipping(
+      netSubtotalAfterCoupon,
+      input.shippingProvince,
+      settings.freeShippingThreshold,
+      freeShippingRules,
+    );
+    const shippingFee = isFreeShipping ? 0 : settings.flatShippingFee;
+    const total = netSubtotalAfterCoupon + shippingFee;
 
     const order = await this.prisma.$transaction(async (tx) => {
+      // Guard flash-sale stock again inside the transaction against a last-instant race —
+      // same pragmatic best-effort tradeoff as the inventory reservation below (no
+      // SERIALIZABLE isolation), acceptable at this system's scale.
+      for (const line of engineResult.lines) {
+        if (!line.flashApplied) continue;
+
+        const flashItem = await tx.flashSaleItem.findFirst({
+          where: {
+            productId: line.productId,
+            flashSale: { isActive: true, startsAt: { lte: new Date() }, endsAt: { gte: new Date() } },
+          },
+        });
+        if (!flashItem) continue;
+
+        if (flashItem.stockLimit !== null && flashItem.stockLimit - flashItem.soldCount < line.quantity) {
+          const productName = cart.items.find((item) => item.productId === line.productId)?.product
+            .name;
+          throw new BadRequestException(
+            `Số lượng giảm giá sốc cho "${productName}" không còn đủ, vui lòng giảm số lượng trong giỏ hàng`,
+          );
+        }
+
+        await tx.flashSaleItem.update({
+          where: { id: flashItem.id },
+          data: { soldCount: { increment: line.quantity } },
+        });
+      }
+
       const created = await tx.order.create({
         data: {
           orderNumber: generateOrderNumber(),

@@ -5,10 +5,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Project
 
 DauTayToy Store — an e-commerce platform for a children's toy store, built as a long-term
-system (web + API meant to also serve a future mobile app), not a simple storefront. Currently
-in Phase 2 (customer-facing catalog/cart/checkout); Phase 3+ (admin panel, marketing features,
-AI modules) are planned but not built. See `docs/architecture.md` for the full log of
-architecture decisions and their rationale, and `docs/ERD.md` for the database diagram.
+system (web + API meant to also serve a future mobile app), not a simple storefront. Phase 2
+(customer-facing catalog/cart/checkout/wishlist/profile/blog/etc.) and Phase 3 (full admin panel
+— see below) are both built. Phase 4+ (a shared promotion/pricing engine to wire the remaining
+marketing entities into checkout, a real payment gateway, AI modules) are planned but not built.
+See `docs/architecture.md` for the full log of architecture decisions and their rationale, and
+`docs/ERD.md` for the database diagram.
 
 ## Commands
 
@@ -84,12 +86,60 @@ on login yet.
 only referencing `Address` (which requires a `userId`), since checkout must work for guests.
 Inventory reservation (`Inventory.quantityReserved`) happens at checkout time in the same
 transaction as order creation, not at payment confirmation — there's no real payment gateway yet
-(COD only) and no cancel/expire flow to release a reservation, so a cancelled order currently
-leaves stock reserved (flagged as Phase 3 work). Order confirmation is passed to the frontend
-directly in the checkout response and stashed in `sessionStorage` for `/order-confirmation/[orderNumber]`
-rather than refetched, to avoid exposing the guest's email via URL query params; a reloaded/fresh
+(COD only). `AdminOrdersService.updateStatus` enforces an explicit state machine and releases
+inventory correctly: moving to `CANCELLED` decrements only `quantityReserved` (stock never left
+the warehouse), moving to `SHIPPED` decrements both `quantityOnHand` and `quantityReserved`
+(stock physically left) — the Phase 2 reservation-release gap is closed. Shipping fee is not a
+hardcoded constant: `OrdersService.checkout` reads `freeShippingThreshold`/`flatShippingFee` live
+from `SettingsModule` (`modules/settings/`, a `@Global()` module storing one `SiteSettings` JSON
+blob under `Setting.key = 'site'`), so an admin editing `/admin/settings` changes checkout
+behavior with no redeploy. Order confirmation is passed to the frontend directly in the checkout
+response and stashed in `sessionStorage` for `/order-confirmation/[orderNumber]` rather than
+refetched, to avoid exposing the guest's email via URL query params; a reloaded/fresh
 confirmation page degrades to pointing at `/order-tracking` (which does need the email, since
 that's an intentional cross-session lookup).
+
+**Admin panel** (`apps/api/src/modules/<domain>` — controllers/services prefixed `Admin*`;
+`apps/web/app/admin/*`): every admin controller is class-decorated with `@Roles(...)` (STAFF
+usually gets read access, write endpoints narrow to `ADMIN`/`SUPER_ADMIN` via a method-level
+`@Roles()` override) and `@AuditLog('EntityType')`. The latter is read by a global
+`AuditLogInterceptor` (`common/interceptors/audit-log.interceptor.ts`, registered as
+`APP_INTERCEPTOR`) that auto-records every mutating request (POST/PATCH/PUT/DELETE — GET is
+always skipped) to the `AuditLog` table: actor from `request.user.id`, `entityId` from the route
+param (`:id`/`:productId`) or the response body, `after` as the response itself (no `before`
+snapshot — no pre-fetch happens). This is why adding a new admin CRUD module only costs one
+decorator line for audit coverage, not a hand-written `record()` call per service. View the log
+at `/admin/audit-logs` (`ADMIN`/`SUPER_ADMIN` only — it contains IPs and full payloads, more
+sensitive than the read-only aggregates at `/admin/reports`, which STAFF can see).
+
+**Marketing / promotion engine** (`modules/marketing/`, `common/utils/promotion-engine.util.ts`,
+`common/promotion-context/`): `Coupon` (code-based) and `FlashSale`/`ComboDeal`/`BuyXGetYRule`/
+`FreeShippingRule` (automatic, no code needed) are all wired into cart/checkout pricing.
+`PromotionContextService` loads whatever's currently active (`isActive` + date window) so
+`CartService` (live preview) and `OrdersService.checkout` (finalization) run the *exact same*
+`runPromotionEngine()` against the *exact same* data — a cart total can never disagree with the
+order it turns into. Application order is fixed: flash sale overrides a line's unit price first,
+then combos greedily claim whole item-sets from a per-product "unclaimed quantity" pool, then
+BuyXGetYRule claims from what's left (so a unit already spent on a combo can't also be a BOGO
+freebie), then Coupon's discount is computed against the resulting `netSubtotal`, then
+`resolveFreeShipping()` checks both `Settings.freeShippingThreshold` and any matching
+`FreeShippingRule` (amount + optional province match) — shipping is free if *either* says so.
+`FlashSaleItem.soldCount` is the only side-effecting counter (incremented inside the checkout
+transaction, re-checked against `stockLimit` right before the increment — same pragmatic
+best-effort concurrency tradeoff as inventory reservation, not `SERIALIZABLE`). Combo/BuyXGetY/
+FreeShipping have no such counter — they're pure price calculations, nothing to persist beyond
+the order's `discountTotal` (which now folds *both* Coupon and automatic-promotion discounts into
+one number — there wasn't room to track them separately without a schema change). `GiftVoucher`
+is still admin-CRUD-only: it has no `Cart`/`Order` relation in the schema at all (unlike `Coupon`,
+which had `couponId` FKs scaffolded since Phase 1), so redemption needs a migration, not just
+service code — left for later.
+
+**Media**: `R2Service` (`infra/r2/`) wraps Cloudflare R2 (S3-compatible, via
+`@aws-sdk/client-s3`) with a lazily-constructed client — the app boots fine with no R2
+credentials configured; only an actual upload/delete call fails, with a clear error naming the
+missing env var. No existing image field (product images, blog cover image, banner image, brand
+logo) is wired to a "pick from library" UI yet — admins upload via `/admin/media` and manually
+paste the returned URL into those still-plain `z.string().url()` text inputs.
 
 **Frontend rendering split**: catalog pages (`/categories`, `/categories/[slug]`, `/products`,
 `/products/[slug]`) are Server Components fetching directly with ISR
@@ -105,6 +155,20 @@ provider.
 **Money**: all prices are `Int` VND (no minor currency unit), so price arithmetic is plain
 integer math — no cents/decimal handling anywhere. Frontend formats via
 `Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' })`.
+
+## TODO before production deploy
+
+- **Leaked Supabase credential in `apps/api/.env.example`**: line with `DIRECT_URL` contains a
+  real password (`db.tqpbdaszqlxhtrnqnvgs.supabase.co`), not a placeholder. Rotate that DB
+  password on Supabase first, then replace the line with a placeholder like the `DATABASE_URL`
+  line above it. Do this before any deploy or public push, not after.
+- **`EmailProcessor` only logs, doesn't send real email** — forgot-password will silently not
+  deliver on production until a real provider (SES/Resend/etc.) is wired in.
+- **Change the seeded admin password** (`admin@dautaytoystore.vn` / `Admin@123456`) before
+  seeding any shared/production environment.
+- After fixing the above and actually deploying, **update this file's "Project" section and this
+  TODO list** to reflect the new state (remove fixed items, note the live deploy URLs/setup if
+  relevant) — don't leave stale TODOs here once they're done.
 
 ## Supabase (alternative to local Postgres)
 

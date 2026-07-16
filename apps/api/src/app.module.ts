@@ -11,6 +11,7 @@ import { buildConfiguration, AppConfiguration } from './config/configuration';
 import { validateEnv } from './config/env.validation';
 import { PrismaModule } from './infra/prisma/prisma.module';
 import { RedisModule } from './infra/redis/redis.module';
+import { PromotionContextModule } from './common/promotion-context/promotion-context.module';
 import { AddressesModule } from './modules/addresses/addresses.module';
 import { AuditLogModule } from './modules/audit-log/audit-log.module';
 import { AuthModule } from './modules/auth/auth.module';
@@ -45,6 +46,7 @@ import { WishlistModule } from './modules/wishlist/wishlist.module';
       ],
     }),
     PrismaModule,
+    PromotionContextModule,
     RedisModule,
     AddressesModule,
     AuditLogModule,

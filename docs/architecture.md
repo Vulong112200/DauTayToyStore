@@ -1,5 +1,70 @@
 # Architecture Decisions
 
+## Phase 4 — Promotion engine: wiring FlashSale, ComboDeal, BuyXGetYRule, FreeShippingRule into checkout
+
+### A pure, DB-free engine function, fed by a shared context loader
+
+`common/utils/promotion-engine.util.ts` exports `runPromotionEngine()` and `resolveFreeShipping()`
+as plain functions operating on plain data — no `PrismaService`, no NestJS DI, nothing async.
+Given cart lines + "what's currently active" (flash sale items, combos, BOGO rules), it returns
+adjusted line prices, the combo/BOGO discount total, and a human-readable list of what applied.
+This is what let it get 19 unit tests with zero mocking — every case (flash price override, stock
+exhaustion, combo greedy matching including the "not actually cheaper" and "flash-adjusted price
+changes whether combo is worth it" edge cases, BOGO with same/different buy-and-get product,
+combo-before-BOGO ordering, free-shipping province matching) is a plain function call with plain
+assertions. `PromotionContextService` (`common/promotion-context/`, `@Global()` like
+`AuditLogModule`/`SettingsModule`) is the only thing that touches Prisma — it loads "active right
+now" flash sale items / combos / BOGO rules / free-shipping rules, filtered by `isActive` and an
+open-ended date window (`startsAt`/`endsAt` null on either side means unbounded). Both
+`CartService` and `OrdersService.checkout` call the same `PromotionContextService` +
+`runPromotionEngine()` pair, so a cart's live total and the order it becomes can never disagree
+on which promotions applied — there's exactly one code path that decides.
+
+### Fixed application order: flash sale → combo → BuyXGetY → coupon → free shipping
+
+Combos are matched before BuyXGetYRule specifically so a unit already "spent" satisfying a combo
+can't *also* be claimed as a free/discounted BOGO unit — verified live: with a combo covering
+products A+B and a BOGO rule "buy A get B", giving the cart exactly one A and one B, only the
+combo applies (it runs first and claims both units from the shared per-product pool); the BOGO
+rule sees nothing left and correctly does not fire (also covered by a dedicated unit test:
+`applies combos before buy-X-get-Y so units are not double-claimed`). Flash sale price overrides
+happen before combo pricing is even evaluated, which matters: a combo is only applied if its
+comparison — combo price vs. the sum of (flash-adjusted) unit prices — actually saves money;
+verified live that an active flash sale on one combo item made the combo *not* worth taking
+(list price using the flash price was cheaper than the combo price), and the engine correctly
+skipped it. Coupon's discount is computed against `netSubtotal` (post flash/combo/BOGO, matching
+the "apply automatic promotions first, then a customer-entered code" convention most storefronts
+use), and free shipping is evaluated last, against the subtotal after *every* discount including
+the coupon — `resolveFreeShipping()` returns true if *either* the site-wide
+`Settings.freeShippingThreshold` is met *or* any active `FreeShippingRule` matches on both amount
+and (if the rule restricts it) the order's shipping province.
+
+### `FlashSaleItem.soldCount` is the only promotion with a persisted side effect
+
+Combo/BuyXGetY/FreeShippingRule are pure price calculations — nothing to write back beyond the
+resulting `Order.discountTotal` (which now folds *both* the coupon discount and the automatic
+promotion discount into one number, since there wasn't schema room to track them as two separate
+columns without a migration). Flash sale is different: its `stockLimit` is a real, shared,
+depletable allocation, so `soldCount` has to be incremented transactionally at checkout, guarded
+against having sold out between cart-preview and checkout — re-checked once before the checkout
+transaction (a friendly, no-transaction-needed early rejection) and once more inside the
+transaction against a freshly-read row (the real guard). This mirrors the exact same
+best-effort-not-`SERIALIZABLE` concurrency tradeoff the existing inventory reservation already
+makes, not a new or weaker guarantee. Verified live: adding more to cart than a flash sale's
+remaining `stockLimit` allows is rejected at `POST /cart/items` (before checkout is even
+reached, since `CartService` also caps `availableStock` by flash remaining stock); a flash-priced
+order line correctly showed the sale price and incremented `soldCount`.
+
+### `CartItemView.availableStock` is capped by flash stock too, not just warehouse inventory
+
+Previously `availableStock` was purely inventory-derived (`quantityOnHand - quantityReserved`).
+Now, for a product-level line with an active flash sale, it's `min(inventoryStock,
+flashRemainingStock)` — so the quantity stepper in the cart UI (and the hard `addItem`/
+`updateItemQuantity` validation) can never let a customer select more than the flash sale
+actually has left, even if the warehouse has plenty of the product at full price. Verified live:
+with 50 units in the warehouse but only 1 flash-sale slot remaining, the cart correctly reported
+`availableStock: 1` and rejected an add-to-cart request for 2.
+
 ## Phase 3 — Remaining marketing entities (GiftVoucher, ComboDeal, BuyXGetYRule, FreeShippingRule)
 
 ### Scope: admin CRUD only, same as FlashSale/Banner — no storefront/checkout wiring

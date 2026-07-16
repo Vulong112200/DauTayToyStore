@@ -171,6 +171,15 @@ export function CheckoutForm() {
           <span className="text-muted-foreground">Tạm tính ({cart.itemCount} sản phẩm)</span>
           <span className="font-medium">{formatVnd(cart.subtotal)}</span>
         </div>
+        {cart.appliedPromotions.map((promo) => (
+          <div key={promo.id} className="mt-1 flex justify-between text-sm">
+            <span className="text-muted-foreground">
+              🎁 {promo.label}
+              {promo.timesApplied > 1 ? ` ×${promo.timesApplied}` : ''}
+            </span>
+            <span className="font-medium text-destructive">-{formatVnd(promo.discountAmount)}</span>
+          </div>
+        ))}
         {cart.couponCode && (
           <div className="mt-1 flex justify-between text-sm">
             <span className="text-muted-foreground">Mã giảm giá ({cart.couponCode})</span>
