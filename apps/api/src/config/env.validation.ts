@@ -6,6 +6,7 @@ export const envSchema = z.object({
   API_PREFIX: z.string().default('api'),
 
   DATABASE_URL: z.string().min(1, 'DATABASE_URL is required'),
+  DIRECT_URL: z.string().min(1, 'DIRECT_URL is required'),
 
   REDIS_URL: z.string().min(1, 'REDIS_URL is required'),
 

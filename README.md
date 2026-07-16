@@ -32,7 +32,23 @@ packages/
 
 - Node.js ≥ 20.11
 - pnpm 9 (`corepack enable` or `npm install -g pnpm@9.15.0`)
-- Docker (for local Postgres + Redis) — or your own Postgres 16 / Redis 7 instances
+- Docker (for local Postgres + Redis) — or a hosted Postgres such as Supabase, plus Redis
+
+### Using Supabase instead of local Postgres
+
+Set `apps/api/.env` with two connection strings instead of the docker-compose one:
+
+```bash
+# Pooled (PgBouncer, transaction mode) — used by the running app at request time.
+DATABASE_URL="postgresql://postgres.<project-ref>:<password>@aws-1-ap-south-1.pooler.supabase.com:6543/postgres?pgbouncer=true&connection_limit=1"
+
+# Direct connection — required for `prisma migrate`/`db push` since PgBouncer's
+# transaction-pooling mode doesn't support the prepared statements/DDL sessions Prisma needs.
+DIRECT_URL="postgresql://postgres.<project-ref>:<password>@aws-1-ap-south-1.pooler.supabase.com:5432/postgres"
+```
+
+Both must be set — `schema.prisma`'s `datasource db` reads `url` from `DATABASE_URL` and
+`directUrl` from `DIRECT_URL`. Redis still needs its own instance (Docker, Upstash, etc.) — Supabase doesn't provide one.
 
 ## Setup
 
