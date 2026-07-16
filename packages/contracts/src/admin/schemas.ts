@@ -617,3 +617,155 @@ export type SiteSettings = z.infer<typeof siteSettingsSchema>;
 
 export const updateSiteSettingsSchema = siteSettingsSchema.partial();
 export type UpdateSiteSettingsInput = z.infer<typeof updateSiteSettingsSchema>;
+
+// --- Admin gift vouchers ---
+
+const giftVoucherCodeSchema = z
+  .string()
+  .min(3, 'Mã quá ngắn')
+  .max(30)
+  .regex(/^[A-Z0-9_-]+$/, 'Mã chỉ gồm chữ hoa, số, gạch ngang và gạch dưới');
+
+export const giftVoucherInputSchema = z.object({
+  code: giftVoucherCodeSchema,
+  amount: z.coerce.number().int().min(1),
+  recipientEmail: z.string().email('Email không hợp lệ').optional(),
+  expiresAt: z.string().datetime().optional(),
+  isActive: z.boolean().default(true),
+});
+export type GiftVoucherInput = z.infer<typeof giftVoucherInputSchema>;
+
+export const updateGiftVoucherInputSchema = z.object({
+  balance: z.coerce.number().int().min(0).optional(),
+  recipientEmail: z.string().email('Email không hợp lệ').optional(),
+  expiresAt: z.string().datetime().optional(),
+  isActive: z.boolean().optional(),
+});
+export type UpdateGiftVoucherInput = z.infer<typeof updateGiftVoucherInputSchema>;
+
+export const adminGiftVoucherSchema = z.object({
+  id: z.string().uuid(),
+  code: z.string(),
+  amount: z.number().int(),
+  balance: z.number().int(),
+  isActive: z.boolean(),
+  recipientEmail: z.string().nullable(),
+  expiresAt: z.string().datetime().nullable(),
+  redeemedAt: z.string().datetime().nullable(),
+});
+export type AdminGiftVoucher = z.infer<typeof adminGiftVoucherSchema>;
+
+export const adminGiftVoucherQuerySchema = z.object({
+  page: z.coerce.number().int().min(1).default(1),
+  pageSize: z.coerce.number().int().min(1).max(100).default(20),
+  q: z.string().optional(),
+});
+export type AdminGiftVoucherQuery = z.infer<typeof adminGiftVoucherQuerySchema>;
+
+// --- Admin combo deals ---
+
+export const comboItemInputSchema = z.object({
+  productId: z.string().uuid(),
+  quantity: z.coerce.number().int().min(1).default(1),
+});
+export type ComboItemInput = z.infer<typeof comboItemInputSchema>;
+
+export const comboDealInputSchema = z.object({
+  name: z.string().min(2, 'Tên quá ngắn').max(150),
+  slug: slugSchema,
+  description: z.string().max(1000).optional(),
+  comboPrice: z.coerce.number().int().min(1),
+  isActive: z.boolean().default(true),
+  startsAt: z.string().datetime().optional(),
+  endsAt: z.string().datetime().optional(),
+  items: z.array(comboItemInputSchema).min(2, 'Combo cần ít nhất 2 sản phẩm'),
+});
+export type ComboDealInput = z.infer<typeof comboDealInputSchema>;
+
+export const adminComboItemSchema = z.object({
+  id: z.string().uuid(),
+  productId: z.string().uuid(),
+  productName: z.string(),
+  unitPrice: z.number().int(),
+  quantity: z.number().int(),
+});
+export type AdminComboItem = z.infer<typeof adminComboItemSchema>;
+
+export const adminComboDealListItemSchema = z.object({
+  id: z.string().uuid(),
+  name: z.string(),
+  slug: z.string(),
+  comboPrice: z.number().int(),
+  isActive: z.boolean(),
+  startsAt: z.string().datetime().nullable(),
+  endsAt: z.string().datetime().nullable(),
+  itemCount: z.number().int(),
+});
+export type AdminComboDealListItem = z.infer<typeof adminComboDealListItemSchema>;
+
+export const adminComboDealDetailSchema = z.object({
+  id: z.string().uuid(),
+  name: z.string(),
+  slug: z.string(),
+  description: z.string().nullable(),
+  comboPrice: z.number().int(),
+  isActive: z.boolean(),
+  startsAt: z.string().datetime().nullable(),
+  endsAt: z.string().datetime().nullable(),
+  items: z.array(adminComboItemSchema),
+});
+export type AdminComboDealDetail = z.infer<typeof adminComboDealDetailSchema>;
+
+// --- Admin buy-X-get-Y rules ---
+
+export const buyXGetYRuleInputSchema = z.object({
+  name: z.string().min(2, 'Tên quá ngắn').max(150),
+  buyProductId: z.string().uuid(),
+  buyQuantity: z.coerce.number().int().min(1),
+  getProductId: z.string().uuid(),
+  getQuantity: z.coerce.number().int().min(1),
+  discountPercent: z.coerce.number().int().min(1).max(100).default(100),
+  isActive: z.boolean().default(true),
+  startsAt: z.string().datetime().optional(),
+  endsAt: z.string().datetime().optional(),
+});
+export type BuyXGetYRuleInput = z.infer<typeof buyXGetYRuleInputSchema>;
+
+export const adminBuyXGetYRuleSchema = z.object({
+  id: z.string().uuid(),
+  name: z.string(),
+  buyProductId: z.string().uuid(),
+  buyProductName: z.string(),
+  buyQuantity: z.number().int(),
+  getProductId: z.string().uuid(),
+  getProductName: z.string(),
+  getQuantity: z.number().int(),
+  discountPercent: z.number().int(),
+  isActive: z.boolean(),
+  startsAt: z.string().datetime().nullable(),
+  endsAt: z.string().datetime().nullable(),
+});
+export type AdminBuyXGetYRule = z.infer<typeof adminBuyXGetYRuleSchema>;
+
+// --- Admin free shipping rules ---
+
+export const freeShippingRuleInputSchema = z.object({
+  name: z.string().min(2, 'Tên quá ngắn').max(150),
+  minOrderAmount: z.coerce.number().int().min(0),
+  applicableProvinces: z.array(z.string()).optional(),
+  isActive: z.boolean().default(true),
+  startsAt: z.string().datetime().optional(),
+  endsAt: z.string().datetime().optional(),
+});
+export type FreeShippingRuleInput = z.infer<typeof freeShippingRuleInputSchema>;
+
+export const adminFreeShippingRuleSchema = z.object({
+  id: z.string().uuid(),
+  name: z.string(),
+  minOrderAmount: z.number().int(),
+  applicableProvinces: z.array(z.string()).nullable(),
+  isActive: z.boolean(),
+  startsAt: z.string().datetime().nullable(),
+  endsAt: z.string().datetime().nullable(),
+});
+export type AdminFreeShippingRule = z.infer<typeof adminFreeShippingRuleSchema>;

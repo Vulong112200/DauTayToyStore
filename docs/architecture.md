@@ -1,5 +1,46 @@
 # Architecture Decisions
 
+## Phase 3 — Remaining marketing entities (GiftVoucher, ComboDeal, BuyXGetYRule, FreeShippingRule)
+
+### Scope: admin CRUD only, same as FlashSale/Banner — no storefront/checkout wiring
+
+This closes out the marketing module started in the Coupon + Flash Sale slice. Like FlashSale,
+none of these four are wired into the cart/checkout price calculation — building that (applying
+a combo price instead of summed line items, granting a free item on a qualifying purchase,
+picking a free-shipping rule by province, redeeming a gift voucher against a total) is a real
+promotion-engine problem shared across all of them, not something to bolt on piecemeal per
+entity. That's consistent with `orders.service.ts`'s own comment history (the Phase 2 shipping
+constants were explicitly flagged as a stopgap "pending Phase 4"), and with GiftVoucher
+specifically: the schema has zero relation from `Cart`/`Order` to `GiftVoucher` (unlike
+`Coupon`, which already had `Cart.couponId`/`Order.couponId` scaffolded in Phase 1) — wiring
+redemption in would mean a schema migration, not just service code, which is out of scope for a
+"finish the remaining CRUD" slice.
+
+### `BuyXGetYRule.buyProductId`/`getProductId` get an application-level existence check
+
+The schema declares these as plain `String` scalars with no `@relation` to `Product` — a
+deliberate-or-not gap already flagged during investigation. Since the DB won't catch a rule
+pointing at a nonexistent product, `AdminBuyXGetYRulesService` checks both ids exist via a single
+`findMany({ where: { id: { in: [...] } } })` before create/update and throws `BadRequestException`
+if either is missing. Verified live: creating a rule with a fake `getProductId` correctly 400s
+before any row is written.
+
+### GiftVoucher's balance is admin-editable independently of its original amount
+
+`amount` (the original face value) is set once at creation and never changes; `balance` (what's
+left) is the only field `AdminGiftVouchersService.update` allows touching, via a separate
+`UpdateGiftVoucherInput` schema from the create input — modeling "issue a voucher" and "adjust/
+correct its remaining balance" as different operations rather than one generic PATCH that could
+accidentally let an admin rewrite the original amount after the fact.
+
+### ComboDeal reads current product name/price at request time, not a snapshot
+
+Like FlashSale's items, `ComboItem` only stores `productId`/`quantity` — `AdminComboDealsService`
+joins live `Product.name`/`Product.price` on every read. If a product's price changes after being
+added to a combo, the admin UI always reflects today's price, not what it was when the combo was
+created; there's no order-time snapshot here because nothing consumes a combo at checkout yet
+(see the scope note above).
+
 ## Phase 3 — Media Library + Settings
 
 ### R2Service constructs its S3 client lazily, so booting without R2 credentials never fails
