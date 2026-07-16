@@ -6,7 +6,9 @@ import { Heart, Menu, Search, ShoppingCart, User, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ThemeToggle } from '@/components/theme-toggle';
 import { useCart } from '@/hooks/use-cart';
+import { useWishlist } from '@/hooks/use-wishlist';
 import { cn } from '@/lib/utils';
+import { useAuthStore } from '@/store/auth-store';
 
 const NAV_LINKS = [
   { href: '/', label: 'Trang chủ' },
@@ -20,8 +22,11 @@ const NAV_LINKS = [
 
 export function SiteHeader() {
   const [mobileOpen, setMobileOpen] = React.useState(false);
+  const user = useAuthStore((state) => state.user);
   const { data: cart } = useCart();
+  const { data: wishlist } = useWishlist(!!user);
   const itemCount = cart?.itemCount ?? 0;
+  const wishlistCount = wishlist?.items.length ?? 0;
 
   return (
     <header className="sticky top-0 z-50 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80">
@@ -54,9 +59,20 @@ export function SiteHeader() {
 
         <div className="flex items-center gap-1">
           <ThemeToggle />
-          <Button variant="ghost" size="icon" asChild aria-label="Danh sách yêu thích">
+          <Button
+            variant="ghost"
+            size="icon"
+            asChild
+            aria-label={`Danh sách yêu thích, ${wishlistCount} sản phẩm`}
+            className="relative"
+          >
             <Link href="/wishlist">
               <Heart className="h-5 w-5" />
+              {wishlistCount > 0 && (
+                <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-semibold text-primary-foreground">
+                  {wishlistCount > 99 ? '99+' : wishlistCount}
+                </span>
+              )}
             </Link>
           </Button>
           <Button variant="ghost" size="icon" asChild aria-label={`Giỏ hàng, ${itemCount} sản phẩm`} className="relative">
@@ -69,8 +85,14 @@ export function SiteHeader() {
               )}
             </Link>
           </Button>
-          <Button variant="ghost" size="icon" asChild aria-label="Tài khoản" className="hidden sm:inline-flex">
-            <Link href="/login">
+          <Button
+            variant="ghost"
+            size="icon"
+            asChild
+            aria-label="Tài khoản"
+            className="hidden sm:inline-flex"
+          >
+            <Link href={user ? '/profile' : '/login'}>
               <User className="h-5 w-5" />
             </Link>
           </Button>
@@ -105,11 +127,11 @@ export function SiteHeader() {
             </Link>
           ))}
           <Link
-            href="/login"
+            href={user ? '/profile' : '/login'}
             className="rounded-lg px-3 py-2 text-sm font-medium hover:bg-muted"
             onClick={() => setMobileOpen(false)}
           >
-            Đăng nhập / Đăng ký
+            {user ? 'Tài khoản của tôi' : 'Đăng nhập / Đăng ký'}
           </Link>
         </nav>
       </div>

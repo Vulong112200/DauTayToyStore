@@ -23,3 +23,7 @@ export function useOrderTracking(query: OrderTrackQuery | null) {
     retry: false,
   });
 }
+
+export function useMyOrders(enabled: boolean) {
+  return useQuery({ queryKey: ['my-orders'], queryFn: ordersApi.listMine, enabled });
+}

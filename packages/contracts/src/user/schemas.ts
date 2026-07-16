@@ -13,6 +13,15 @@ export const userProfileSchema = z.object({
 });
 export type UserProfile = z.infer<typeof userProfileSchema>;
 
+export const updateProfileSchema = z.object({
+  fullName: z.string().min(2, 'Họ tên quá ngắn').max(100).optional(),
+  phone: z
+    .string()
+    .regex(/^(0|\+84)(\d{9,10})$/, 'Số điện thoại không hợp lệ')
+    .optional(),
+});
+export type UpdateProfileInput = z.infer<typeof updateProfileSchema>;
+
 export const authResponseSchema = z.object({
   user: userProfileSchema,
   tokens: z.object({

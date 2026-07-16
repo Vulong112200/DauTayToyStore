@@ -1,5 +1,34 @@
 # Architecture Decisions
 
+## Phase 2 — Wishlist + Profile
+
+### Extracted `product-list.util.ts` before adding Wishlist
+
+`WishlistService` needed to return the exact same `ProductListItem` shape `ProductsService`
+already builds (image, brand, stock, rating) for wishlist entries. Rather than duplicate the
+Prisma `select` shape and the row→DTO mapping a second time, both now import
+`PRODUCT_LIST_SELECT`/`toProductListItem` from `modules/catalog/products/product-list.util.ts`.
+Concrete payoff: fixing an inStock/rating mapping bug now only has one place to fix.
+
+### Address book's "single default address" invariant lives in the service, not the DB
+
+`Address.isDefault` has no partial-unique-index enforcing "at most one default per user" at the
+Postgres level — enforcing it there would need a partial unique index
+(`WHERE is_default = true`), which Prisma's schema DSL doesn't express directly (would require a
+raw migration). Simpler and sufficient for now: `AddressesService.create`/`update` unset every
+other address's `isDefault` in the same request whenever the incoming one sets `isDefault: true`
+— verified against Supabase that creating a second default address correctly flips the first
+back to `false`.
+
+### Profile page added the app's first real logout
+
+Every earlier phase built session *creation* (register/login/Google) but nothing called
+`POST /auth/logout` from the UI — tokens only ever got cleared by a hard localStorage wipe during
+manual testing. `ProfileView`'s logout button is the first place that both revokes the refresh
+token server-side and clears the Zustand session, so it's the natural place this landed rather
+than bolting a logout button onto the header speculatively before there was a page that needed
+one.
+
 ## Phase 2 — Checkout + Order
 
 ### Shipping address is snapshotted onto `Order`, not just referenced via `Address`

@@ -10,12 +10,15 @@ import { buildConfiguration, AppConfiguration } from './config/configuration';
 import { validateEnv } from './config/env.validation';
 import { PrismaModule } from './infra/prisma/prisma.module';
 import { RedisModule } from './infra/redis/redis.module';
+import { AddressesModule } from './modules/addresses/addresses.module';
 import { AuditLogModule } from './modules/audit-log/audit-log.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { CartModule } from './modules/cart/cart.module';
 import { CatalogModule } from './modules/catalog/catalog.module';
 import { HealthModule } from './modules/health/health.module';
 import { OrdersModule } from './modules/orders/orders.module';
+import { UsersModule } from './modules/users/users.module';
+import { WishlistModule } from './modules/wishlist/wishlist.module';
 
 @Module({
   imports: [
@@ -35,12 +38,15 @@ import { OrdersModule } from './modules/orders/orders.module';
     }),
     PrismaModule,
     RedisModule,
+    AddressesModule,
     AuditLogModule,
     AuthModule,
     CartModule,
     CatalogModule,
     HealthModule,
     OrdersModule,
+    UsersModule,
+    WishlistModule,
   ],
   providers: [
     { provide: APP_FILTER, useClass: HttpExceptionFilter },

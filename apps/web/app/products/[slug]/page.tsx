@@ -5,6 +5,7 @@ import { notFound } from 'next/navigation';
 import { Star } from 'lucide-react';
 import { ProductCard } from '@/components/catalog/product-card';
 import { AddToCartButton } from '@/components/cart/add-to-cart-button';
+import { WishlistButton } from '@/components/wishlist/wishlist-button';
 import { ApiError } from '@/lib/api-client';
 import { productsApi } from '@/lib/api/products';
 import { formatVnd } from '@/lib/utils';
@@ -158,7 +159,10 @@ export default async function ProductDetailPage({ params }: PageProps) {
             {product.inStock ? '✅ Còn hàng' : '❌ Hết hàng'}
           </p>
 
-          <AddToCartButton productId={product.id} inStock={product.inStock} />
+          <div className="flex items-center gap-3">
+            <AddToCartButton productId={product.id} inStock={product.inStock} />
+            <WishlistButton productId={product.id} className="static shadow-none border border-input" />
+          </div>
         </div>
       </div>
 

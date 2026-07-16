@@ -7,50 +7,11 @@ import type {
   ProductListQuery,
 } from '@repo/contracts';
 import { PrismaService } from '../../../infra/prisma/prisma.service';
-
-const LIST_SELECT = {
-  id: true,
-  slug: true,
-  name: true,
-  price: true,
-  compareAtPrice: true,
-  avgRating: true,
-  reviewCount: true,
-  brand: { select: { name: true } },
-  images: {
-    where: { isPrimary: true },
-    take: 1,
-    select: { url: true },
-  },
-  inventory: { select: { quantityOnHand: true, quantityReserved: true } },
-  variants: { select: { id: true } },
-} satisfies Prisma.ProductSelect;
-
-type ProductListRow = Prisma.ProductGetPayload<{ select: typeof LIST_SELECT }>;
-
-function isRowInStock(row: {
-  inventory: { quantityOnHand: number; quantityReserved: number } | null;
-  variants: { id: string }[];
-}): boolean {
-  if (row.variants.length > 0) return true;
-  if (!row.inventory) return true;
-  return row.inventory.quantityOnHand - row.inventory.quantityReserved > 0;
-}
-
-function toListItem(row: ProductListRow): ProductListItem {
-  return {
-    id: row.id,
-    slug: row.slug,
-    name: row.name,
-    price: row.price,
-    compareAtPrice: row.compareAtPrice,
-    avgRating: row.avgRating,
-    reviewCount: row.reviewCount,
-    primaryImageUrl: row.images[0]?.url ?? null,
-    brandName: row.brand?.name ?? null,
-    inStock: isRowInStock(row),
-  };
-}
+import {
+  PRODUCT_LIST_SELECT,
+  isProductRowInStock,
+  toProductListItem,
+} from './product-list.util';
 
 @Injectable()
 export class ProductsService {
@@ -95,13 +56,13 @@ export class ProductsService {
         orderBy,
         skip: (query.page - 1) * query.pageSize,
         take: query.pageSize,
-        select: LIST_SELECT,
+        select: PRODUCT_LIST_SELECT,
       }),
       this.prisma.product.count({ where }),
     ]);
 
     return {
-      items: rows.map(toListItem),
+      items: rows.map(toProductListItem),
       meta: {
         page: query.page,
         pageSize: query.pageSize,
@@ -127,7 +88,7 @@ export class ProductsService {
         faqs: { orderBy: { sortOrder: 'asc' } },
         inventory: { select: { quantityOnHand: true, quantityReserved: true } },
         relationsFrom: {
-          include: { related: { select: LIST_SELECT } },
+          include: { related: { select: PRODUCT_LIST_SELECT } },
         },
       },
     });
@@ -139,7 +100,7 @@ export class ProductsService {
     const relationsByType = (type: ProductRelationType): ProductListItem[] =>
       product.relationsFrom
         .filter((relation) => relation.type === type)
-        .map((relation) => toListItem(relation.related));
+        .map((relation) => toProductListItem(relation.related));
 
     return {
       id: product.id,
@@ -191,7 +152,7 @@ export class ProductsService {
       related: relationsByType(ProductRelationType.RELATED),
       upsell: relationsByType(ProductRelationType.UPSELL),
       crossSell: relationsByType(ProductRelationType.CROSS_SELL),
-      inStock: isRowInStock({ inventory: product.inventory, variants: product.variants }),
+      inStock: isProductRowInStock({ inventory: product.inventory, variants: product.variants }),
       metaTitle: product.metaTitle,
       metaDescription: product.metaDescription,
     };

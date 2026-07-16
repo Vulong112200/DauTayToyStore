@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { Star } from 'lucide-react';
 import type { ProductListItem } from '@repo/contracts';
 import { Card, CardContent } from '@/components/ui/card';
+import { WishlistButton } from '@/components/wishlist/wishlist-button';
 import { formatVnd } from '@/lib/utils';
 
 export function ProductCard({ product }: { product: ProductListItem }) {
@@ -27,6 +28,7 @@ export function ProductCard({ product }: { product: ProductListItem }) {
             Hết hàng
           </span>
         )}
+        <WishlistButton productId={product.id} className="absolute right-2 top-2" />
       </Link>
       <CardContent className="flex flex-1 flex-col gap-2 p-4">
         {product.brandName && (

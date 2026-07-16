@@ -5,3 +5,5 @@ export * from './user/schemas.js';
 export * from './catalog/schemas.js';
 export * from './cart/schemas.js';
 export * from './orders/schemas.js';
+export * from './wishlist/schemas.js';
+export * from './addresses/schemas.js';
