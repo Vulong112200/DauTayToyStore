@@ -16,6 +16,7 @@ import {
   resetPasswordSchema,
 } from '@repo/contracts';
 import { Request } from 'express';
+import { CART_SESSION_HEADER } from '../../common/cart-identity/cart-identity.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Public } from '../../common/decorators/public.decorator';
 import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe';
@@ -29,6 +30,13 @@ function extractMeta(req: Request) {
   };
 }
 
+/** The frontend sends its guest cart session id on login/register/Google-login so any items
+ * added before signing in can be merged into the account's cart — see AuthService. */
+function extractGuestCartSessionId(req: Request): string | undefined {
+  const header = req.headers[CART_SESSION_HEADER];
+  return Array.isArray(header) ? header[0] : header;
+}
+
 @ApiTags('auth')
 @Controller('auth')
 export class AuthController {
@@ -39,7 +47,7 @@ export class AuthController {
   @ApiOperation({ summary: 'Đăng ký tài khoản mới' })
   @UsePipes(new ZodValidationPipe(registerSchema))
   register(@Body() body: RegisterInput, @Req() req: Request): Promise<AuthResponse> {
-    return this.authService.register(body, extractMeta(req));
+    return this.authService.register(body, extractMeta(req), extractGuestCartSessionId(req));
   }
 
   @Public()
@@ -47,7 +55,7 @@ export class AuthController {
   @ApiOperation({ summary: 'Đăng nhập bằng email/mật khẩu' })
   @UsePipes(new ZodValidationPipe(loginSchema))
   login(@Body() body: LoginInput, @Req() req: Request): Promise<AuthResponse> {
-    return this.authService.login(body, extractMeta(req));
+    return this.authService.login(body, extractMeta(req), extractGuestCartSessionId(req));
   }
 
   @Public()
@@ -55,7 +63,11 @@ export class AuthController {
   @ApiOperation({ summary: 'Đăng nhập/đăng ký bằng Google ID token' })
   @UsePipes(new ZodValidationPipe(googleAuthSchema))
   loginWithGoogle(@Body() body: GoogleAuthInput, @Req() req: Request): Promise<AuthResponse> {
-    return this.authService.loginWithGoogle(body.idToken, extractMeta(req));
+    return this.authService.loginWithGoogle(
+      body.idToken,
+      extractMeta(req),
+      extractGuestCartSessionId(req),
+    );
   }
 
   @Public()

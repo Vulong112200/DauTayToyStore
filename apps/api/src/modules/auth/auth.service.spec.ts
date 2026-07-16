@@ -4,6 +4,7 @@ import { JwtService } from '@nestjs/jwt';
 import { RoleName } from '@prisma/client';
 import * as argon2 from 'argon2';
 import { AuditLogService } from '../audit-log/audit-log.service';
+import { CartService } from '../cart/cart.service';
 import { EmailService } from '../notifications/email.service';
 import { PrismaService } from '../../infra/prisma/prisma.service';
 import { AuthService } from './auth.service';
@@ -27,6 +28,7 @@ describe('AuthService', () => {
   let configService: { get: jest.Mock };
   let auditLogService: { record: jest.Mock };
   let emailService: { sendPasswordResetEmail: jest.Mock };
+  let cartService: { mergeGuestCartIntoUserCart: jest.Mock };
 
   const configValues: Record<string, unknown> = {
     'jwt.accessSecret': 'access-secret-for-tests-min-32-characters',
@@ -49,6 +51,7 @@ describe('AuthService', () => {
     configService = { get: jest.fn((key: string) => configValues[key]) };
     auditLogService = { record: jest.fn() };
     emailService = { sendPasswordResetEmail: jest.fn() };
+    cartService = { mergeGuestCartIntoUserCart: jest.fn().mockResolvedValue(undefined) };
 
     authService = new AuthService(
       prisma as unknown as PrismaService,
@@ -56,6 +59,7 @@ describe('AuthService', () => {
       configService as unknown as ConfigService<never, true>,
       auditLogService as unknown as AuditLogService,
       emailService as unknown as EmailService,
+      cartService as unknown as CartService,
     );
 
     jwtService.signAsync.mockResolvedValue('signed.jwt.token');
@@ -102,6 +106,56 @@ describe('AuthService', () => {
       expect(auditLogService.record).toHaveBeenCalledWith(
         expect.objectContaining({ action: 'user.register' }),
       );
+    });
+
+    it('merges the guest cart when a session id is provided', async () => {
+      prisma.user.findUnique.mockResolvedValue(null);
+      prisma.role.findUniqueOrThrow.mockResolvedValue({ id: 'role-customer', name: RoleName.CUSTOMER });
+      prisma.user.create.mockResolvedValue({
+        id: 'user-1',
+        email: 'new@example.com',
+        fullName: 'Nguyen Van A',
+        phone: null,
+        avatarUrl: null,
+        isEmailVerified: false,
+        createdAt: new Date('2026-01-01'),
+        roles: [{ role: { name: RoleName.CUSTOMER } }],
+      });
+      prisma.refreshToken.create.mockResolvedValue({});
+
+      await authService.register(
+        { email: 'new@example.com', password: 'Password1', fullName: 'Nguyen Van A' },
+        {},
+        'guest-session-1',
+      );
+
+      expect(cartService.mergeGuestCartIntoUserCart).toHaveBeenCalledWith(
+        'user-1',
+        'guest-session-1',
+      );
+    });
+
+    it('does not attempt a merge when no guest session id was provided', async () => {
+      prisma.user.findUnique.mockResolvedValue(null);
+      prisma.role.findUniqueOrThrow.mockResolvedValue({ id: 'role-customer', name: RoleName.CUSTOMER });
+      prisma.user.create.mockResolvedValue({
+        id: 'user-1',
+        email: 'new@example.com',
+        fullName: 'Nguyen Van A',
+        phone: null,
+        avatarUrl: null,
+        isEmailVerified: false,
+        createdAt: new Date('2026-01-01'),
+        roles: [{ role: { name: RoleName.CUSTOMER } }],
+      });
+      prisma.refreshToken.create.mockResolvedValue({});
+
+      await authService.register(
+        { email: 'new@example.com', password: 'Password1', fullName: 'Nguyen Van A' },
+        {},
+      );
+
+      expect(cartService.mergeGuestCartIntoUserCart).not.toHaveBeenCalled();
     });
   });
 
@@ -157,6 +211,62 @@ describe('AuthService', () => {
           data: expect.objectContaining({ tokenHash: hashToken('signed.jwt.token') }),
         }),
       );
+    });
+
+    it('merges the guest cart when a session id is provided', async () => {
+      const passwordHash = await argon2.hash('CorrectPassword1');
+      prisma.user.findUnique.mockResolvedValue({
+        id: 'user-1',
+        email: 'user@example.com',
+        fullName: 'Nguyen Van A',
+        phone: null,
+        avatarUrl: null,
+        isEmailVerified: true,
+        createdAt: new Date('2026-01-01'),
+        passwordHash,
+        isActive: true,
+        roles: [{ role: { name: RoleName.CUSTOMER } }],
+      });
+      prisma.user.update.mockResolvedValue({});
+      prisma.refreshToken.create.mockResolvedValue({});
+
+      await authService.login(
+        { email: 'user@example.com', password: 'CorrectPassword1' },
+        {},
+        'guest-session-2',
+      );
+
+      expect(cartService.mergeGuestCartIntoUserCart).toHaveBeenCalledWith(
+        'user-1',
+        'guest-session-2',
+      );
+    });
+
+    it('does not fail the login when the cart merge itself throws', async () => {
+      const passwordHash = await argon2.hash('CorrectPassword1');
+      prisma.user.findUnique.mockResolvedValue({
+        id: 'user-1',
+        email: 'user@example.com',
+        fullName: 'Nguyen Van A',
+        phone: null,
+        avatarUrl: null,
+        isEmailVerified: true,
+        createdAt: new Date('2026-01-01'),
+        passwordHash,
+        isActive: true,
+        roles: [{ role: { name: RoleName.CUSTOMER } }],
+      });
+      prisma.user.update.mockResolvedValue({});
+      prisma.refreshToken.create.mockResolvedValue({});
+      cartService.mergeGuestCartIntoUserCart.mockRejectedValue(new Error('db hiccup'));
+
+      const result = await authService.login(
+        { email: 'user@example.com', password: 'CorrectPassword1' },
+        {},
+        'guest-session-3',
+      );
+
+      expect(result.tokens.accessToken).toBe('signed.jwt.token');
     });
   });
 

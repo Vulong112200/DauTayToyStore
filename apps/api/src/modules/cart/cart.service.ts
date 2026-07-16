@@ -181,6 +181,70 @@ export class CartService {
     return this.loadCartView(cart.id);
   }
 
+  /**
+   * Called right after a successful login/register/Google-login when the request carried a
+   * guest `x-cart-session` — folds that guest cart's items into the user's own cart (creating
+   * one if they didn't have one yet) and discards the guest cart. Quantities for the same
+   * (productId, variantId) are summed rather than overwritten; stock/flash-sale caps are not
+   * re-checked here (same as elsewhere, checkout is the final backstop) so a merge can never
+   * itself throw and block a login. The guest cart's coupon only carries over if the user's
+   * cart doesn't already have one — an existing applied coupon on the account wins.
+   */
+  async mergeGuestCartIntoUserCart(userId: string, sessionId: string): Promise<void> {
+    const guestCart = await this.prisma.cart.findUnique({
+      where: { sessionId },
+      include: { items: true },
+    });
+
+    if (!guestCart) return;
+
+    if (guestCart.items.length === 0) {
+      await this.prisma.cart.delete({ where: { id: guestCart.id } });
+      return;
+    }
+
+    const userCart = await this.prisma.cart.upsert({
+      where: { userId },
+      update: {},
+      create: { userId },
+      include: { items: true },
+    });
+
+    if (userCart.id === guestCart.id) return;
+
+    await this.prisma.$transaction(async (tx) => {
+      for (const guestItem of guestCart.items) {
+        const existing = userCart.items.find(
+          (item) => item.productId === guestItem.productId && item.variantId === guestItem.variantId,
+        );
+
+        if (existing) {
+          await tx.cartItem.update({
+            where: { id: existing.id },
+            data: { quantity: existing.quantity + guestItem.quantity },
+          });
+        } else {
+          await tx.cartItem.create({
+            data: {
+              cartId: userCart.id,
+              productId: guestItem.productId,
+              variantId: guestItem.variantId,
+              quantity: guestItem.quantity,
+            },
+          });
+        }
+      }
+
+      if (guestCart.couponId && !userCart.couponId) {
+        await tx.cart.update({ where: { id: userCart.id }, data: { couponId: guestCart.couponId } });
+      }
+
+      // Cascades onto guestCart's own CartItem rows — already copied above, so this just
+      // discards the now-redundant originals along with the empty shell cart.
+      await tx.cart.delete({ where: { id: guestCart.id } });
+    });
+  }
+
   private async getOrCreateCart(identity: CartIdentity): Promise<{ id: string }> {
     if (identity.userId) {
       return this.prisma.cart.upsert({

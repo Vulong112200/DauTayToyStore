@@ -1,5 +1,50 @@
 # Architecture Decisions
 
+## Phase 4 — Guest→user cart merge on login
+
+### The merge point is the auth flow, not the cart flow — auth controllers read the guest header directly, no guard involved
+
+`CartIdentityGuard` (the thing that normally resolves `x-cart-session`/Bearer into a
+`CartIdentity`) is deliberately **not** attached to any `/auth/*` route: those routes are
+`@Public()` and mixing in a guard that also independently tries to verify a Bearer token would
+be confusing noise for a login endpoint that, by definition, doesn't have a valid access token
+yet. Instead `AuthController` reads `req.headers[CART_SESSION_HEADER]` directly (importing the
+same `CART_SESSION_HEADER` constant from `cart-identity.guard.ts` rather than re-declaring the
+header name) and passes it as a plain optional `sessionId` argument into
+`AuthService.register`/`login`/`loginWithGoogle`. `CartService` is imported into `AuthModule`
+(safe, one-directional — `CartModule` has no dependency back on `AuthModule`) purely to call the
+one new public method, `mergeGuestCartIntoUserCart`.
+
+### A merge failure can never break a login/register — same philosophy as AuditLogService
+
+`AuthService.mergeGuestCartIfNeeded` wraps the actual merge call in a try/catch and only logs on
+failure, exactly like `AuditLogService.record` already does for its own side effect. A cart merge
+going wrong (some unexpected DB hiccup) is not a reason to fail the auth response the user is
+actually waiting on — worst case, their guest cart just doesn't merge this one time, which is
+recoverable (the guest cart still exists under its old session id if the merge silently no-op'd
+partway... though in practice the merge is one Prisma transaction, so it's all-or-nothing; the
+try/catch is for the rare case the merge call itself throws before or after the transaction, e.g.
+a connection blip). Verified with a dedicated test (`does not fail the login when the cart merge
+itself throws`) that a rejected merge still returns valid tokens.
+
+### Quantities are summed, not overwritten or dropped; the guest cart is deleted, not just re-pointed
+
+`Cart.userId` and `Cart.sessionId` are both `@unique`, so a guest cart can't simply have its
+`sessionId` swapped for the user's `userId` if that user already has their own cart (two rows
+would violate the same conceptual identity). `mergeGuestCartIntoUserCart` instead: finds/creates
+the user's cart, and for each guest `CartItem` either increments an existing matching
+`(productId, variantId)` line in the user cart or creates a new one, then deletes the guest cart
+(cascading away its now-redundant original `CartItem` rows). No stock/flash-sale re-validation
+happens during the merge itself — same tradeoff as the rest of cart mutation, checkout remains the
+final backstop that would reject an over-quantity line. The guest cart's coupon carries over only
+if the user's cart doesn't already have one applied (an existing applied coupon on the account
+wins over whatever the guest session had). Verified live: adding 2 units as a guest, then
+registering with that session header, produced a fresh account cart with those 2 units; a second
+guest session adding 3 more of the *same* product, then logging into that same account, correctly
+summed to 5 (not 3, not two separate lines) — and the old guest cart's session subsequently
+resolves to a brand-new empty cart, confirming the merged-from cart was actually deleted, not
+left dangling.
+
 ## Phase 4 — Promotion engine: wiring FlashSale, ComboDeal, BuyXGetYRule, FreeShippingRule into checkout
 
 ### A pure, DB-free engine function, fed by a shared context loader

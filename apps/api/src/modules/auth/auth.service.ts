@@ -14,6 +14,7 @@ import { randomUUID } from 'node:crypto';
 import { AppConfiguration } from '../../config/configuration';
 import { PrismaService } from '../../infra/prisma/prisma.service';
 import { AuditLogService } from '../audit-log/audit-log.service';
+import { CartService } from '../cart/cart.service';
 import { EmailService } from '../notifications/email.service';
 import { parseDurationToMs } from '../../common/utils/duration.util';
 import { hashToken } from './utils/token-hash.util';
@@ -34,11 +35,16 @@ export class AuthService {
     private readonly configService: ConfigService<AppConfiguration, true>,
     private readonly auditLogService: AuditLogService,
     private readonly emailService: EmailService,
+    private readonly cartService: CartService,
   ) {
     this.googleClient = new OAuth2Client(this.configService.get('google.clientId', { infer: true }));
   }
 
-  async register(input: RegisterInput, meta: RequestMetadata): Promise<AuthResponse> {
+  async register(
+    input: RegisterInput,
+    meta: RequestMetadata,
+    guestCartSessionId?: string,
+  ): Promise<AuthResponse> {
     const existing = await this.prisma.user.findUnique({ where: { email: input.email } });
     if (existing) {
       throw new ConflictException('Email đã được sử dụng');
@@ -69,10 +75,16 @@ export class AuthService {
       userAgent: meta.userAgent,
     });
 
+    await this.mergeGuestCartIfNeeded(user.id, guestCartSessionId);
+
     return this.buildAuthResponse(user, meta);
   }
 
-  async login(input: LoginInput, meta: RequestMetadata): Promise<AuthResponse> {
+  async login(
+    input: LoginInput,
+    meta: RequestMetadata,
+    guestCartSessionId?: string,
+  ): Promise<AuthResponse> {
     const user = await this.prisma.user.findUnique({
       where: { email: input.email },
       include: { roles: { include: { role: true } } },
@@ -101,10 +113,16 @@ export class AuthService {
       userAgent: meta.userAgent,
     });
 
+    await this.mergeGuestCartIfNeeded(user.id, guestCartSessionId);
+
     return this.buildAuthResponse(user, meta);
   }
 
-  async loginWithGoogle(idToken: string, meta: RequestMetadata): Promise<AuthResponse> {
+  async loginWithGoogle(
+    idToken: string,
+    meta: RequestMetadata,
+    guestCartSessionId?: string,
+  ): Promise<AuthResponse> {
     const ticket = await this.googleClient.verifyIdToken({
       idToken,
       audience: this.configService.get('google.clientId', { infer: true }),
@@ -153,6 +171,8 @@ export class AuthService {
       ipAddress: meta.ipAddress,
       userAgent: meta.userAgent,
     });
+
+    await this.mergeGuestCartIfNeeded(user.id, guestCartSessionId);
 
     return this.buildAuthResponse(user, meta);
   }
@@ -249,6 +269,21 @@ export class AuthService {
         data: { revokedAt: new Date() },
       }),
     ]);
+  }
+
+  /** Never lets a merge failure block the login/register response itself — same
+   * never-break-the-caller philosophy as AuditLogService.record. */
+  private async mergeGuestCartIfNeeded(userId: string, sessionId: string | undefined): Promise<void> {
+    if (!sessionId) return;
+
+    try {
+      await this.cartService.mergeGuestCartIntoUserCart(userId, sessionId);
+    } catch (error) {
+      this.logger.error(
+        'Failed to merge guest cart into user cart',
+        error instanceof Error ? error.stack : undefined,
+      );
+    }
   }
 
   private async buildAuthResponse(

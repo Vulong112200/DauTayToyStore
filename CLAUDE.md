@@ -79,8 +79,12 @@ schema but not yet enforced.
 (`common/cart-identity/`, not inside `modules/cart` — it's shared with Orders/checkout) tries a
 `Bearer` token first, falling back to an `x-cart-session` header (a UUID the frontend generates
 once into `localStorage`, `apps/web/lib/cart-session.ts`). `Cart.userId`/`Cart.sessionId` are
-both `@unique`; `CartService` upserts on whichever identity is present. No guest→user cart merge
-on login yet.
+both `@unique`; `CartService` upserts on whichever identity is present. On register/login/Google-
+login, `AuthController` reads that same `x-cart-session` header directly (no guard — auth routes
+are `@Public()`) and `CartService.mergeGuestCartIntoUserCart` folds the guest cart into the
+account's cart (summing quantities for matching product/variant lines, then deleting the guest
+cart) — wrapped in a try/catch in `AuthService` so a merge failure can never fail the login
+response itself.
 
 **Checkout/orders**: `Order` snapshots the shipping address onto its own columns rather than
 only referencing `Address` (which requires a `userId`), since checkout must work for guests.

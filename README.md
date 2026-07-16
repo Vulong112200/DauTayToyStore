@@ -140,7 +140,9 @@ pnpm docker:down
   all wired into a shared promotion engine at cart/checkout — see `docs/architecture.md`; gift
   voucher is admin CRUD only, redemption needs a schema migration), audit logs, reports, media
   library (Cloudflare R2, verified live), site settings
-- **Phase 4** — gift voucher redemption at checkout (needs a `Cart`/`Order` → `GiftVoucher`
-  migration); a real payment gateway (COD only today); guest→user cart merge on login; a
-  media-picker UI wired into the existing raw-URL image fields (product/blog/banner/brand)
+- **Phase 4** — ✅ promotion engine (flash sale/combo/buy-X-get-Y/free-shipping all wired into
+  checkout pricing) and ✅ guest→user cart merge on login are done; still open: gift voucher
+  redemption at checkout (needs a `Cart`/`Order` → `GiftVoucher` migration); a real payment
+  gateway (COD only today); a media-picker UI wired into the existing raw-URL image fields
+  (product/blog/banner/brand)
 - **Phase 5** — AI modules (description/SEO/FAQ generation, chat assistant, recommendations, image tooling)

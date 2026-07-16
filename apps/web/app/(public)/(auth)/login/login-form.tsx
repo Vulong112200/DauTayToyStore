@@ -3,18 +3,21 @@
 import * as React from 'react';
 import { useRouter } from 'next/navigation';
 import { zodResolver } from '@hookform/resolvers/zod';
+import { useQueryClient } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
 import { type LoginInput, loginSchema } from '@repo/contracts';
 import { FormError } from '@/components/auth/form-error';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { CART_QUERY_KEY } from '@/hooks/use-cart';
 import { ApiError } from '@/lib/api-client';
 import { authApi } from '@/lib/api/auth';
 import { useAuthStore } from '@/store/auth-store';
 
 export function LoginForm() {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const setSession = useAuthStore((state) => state.setSession);
   const [serverError, setServerError] = React.useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = React.useState(false);
@@ -31,6 +34,9 @@ export function LoginForm() {
     try {
       const response = await authApi.login(values);
       setSession(response.user, response.tokens);
+      // The API may have just merged a guest cart into this account's cart —
+      // drop the cached (pre-login) cart so the next read reflects the merge.
+      await queryClient.invalidateQueries({ queryKey: CART_QUERY_KEY });
       router.push('/');
       router.refresh();
     } catch (error) {

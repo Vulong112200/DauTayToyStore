@@ -15,7 +15,13 @@ describe('CartService', () => {
     productVariant: { findUnique: jest.Mock };
     coupon: { findUnique: jest.Mock };
     order: { count: jest.Mock };
-    cart: { upsert: jest.Mock; update: jest.Mock; findUniqueOrThrow: jest.Mock };
+    cart: {
+      upsert: jest.Mock;
+      update: jest.Mock;
+      findUniqueOrThrow: jest.Mock;
+      findUnique: jest.Mock;
+      delete: jest.Mock;
+    };
     cartItem: {
       findFirst: jest.Mock;
       create: jest.Mock;
@@ -23,6 +29,7 @@ describe('CartService', () => {
       findMany: jest.Mock;
       deleteMany: jest.Mock;
     };
+    $transaction: jest.Mock;
   };
 
   const cart = { id: 'cart-1' };
@@ -37,6 +44,8 @@ describe('CartService', () => {
         upsert: jest.fn().mockResolvedValue(cart),
         update: jest.fn(),
         findUniqueOrThrow: jest.fn().mockResolvedValue({ ...cart, coupon: null }),
+        findUnique: jest.fn(),
+        delete: jest.fn(),
       },
       cartItem: {
         findFirst: jest.fn(),
@@ -45,6 +54,12 @@ describe('CartService', () => {
         findMany: jest.fn().mockResolvedValue([]),
         deleteMany: jest.fn(),
       },
+      $transaction: jest.fn(async (callback: (tx: unknown) => unknown) =>
+        callback({
+          cartItem: { update: prisma.cartItem.update, create: prisma.cartItem.create },
+          cart: { update: prisma.cart.update, delete: prisma.cart.delete },
+        }),
+      ),
     };
     promotionContext = {
       loadFlashSaleItems: jest.fn().mockResolvedValue([]),
@@ -319,6 +334,82 @@ describe('CartService', () => {
         { type: 'COMBO', id: 'combo-1', label: 'Combo A+B', discountAmount: 30_000, timesApplied: 1 },
       ]);
       expect(result.total).toBe(150_000);
+    });
+  });
+
+  describe('mergeGuestCartIntoUserCart', () => {
+    it('does nothing when there is no guest cart for that session', async () => {
+      prisma.cart.findUnique.mockResolvedValue(null);
+
+      await service.mergeGuestCartIntoUserCart('user-1', 'session-1');
+
+      expect(prisma.cart.upsert).not.toHaveBeenCalled();
+      expect(prisma.cart.delete).not.toHaveBeenCalled();
+    });
+
+    it('deletes an empty guest cart without touching the user cart', async () => {
+      prisma.cart.findUnique.mockResolvedValue({ id: 'guest-cart', couponId: null, items: [] });
+
+      await service.mergeGuestCartIntoUserCart('user-1', 'session-1');
+
+      expect(prisma.cart.delete).toHaveBeenCalledWith({ where: { id: 'guest-cart' } });
+      expect(prisma.cart.upsert).not.toHaveBeenCalled();
+    });
+
+    it('creates new items and sums quantities for items already in the user cart', async () => {
+      prisma.cart.findUnique.mockResolvedValue({
+        id: 'guest-cart',
+        couponId: null,
+        items: [
+          { id: 'gi-1', productId: 'p1', variantId: null, quantity: 2 },
+          { id: 'gi-2', productId: 'p2', variantId: null, quantity: 1 },
+        ],
+      });
+      prisma.cart.upsert.mockResolvedValue({
+        id: 'user-cart',
+        couponId: null,
+        items: [{ id: 'ui-1', productId: 'p1', variantId: null, quantity: 3 }],
+      });
+
+      await service.mergeGuestCartIntoUserCart('user-1', 'session-1');
+
+      expect(prisma.cartItem.update).toHaveBeenCalledWith({
+        where: { id: 'ui-1' },
+        data: { quantity: 5 },
+      });
+      expect(prisma.cartItem.create).toHaveBeenCalledWith({
+        data: { cartId: 'user-cart', productId: 'p2', variantId: null, quantity: 1 },
+      });
+      expect(prisma.cart.delete).toHaveBeenCalledWith({ where: { id: 'guest-cart' } });
+    });
+
+    it('carries the guest cart coupon over only when the user cart has none', async () => {
+      prisma.cart.findUnique.mockResolvedValue({
+        id: 'guest-cart',
+        couponId: 'coupon-1',
+        items: [{ id: 'gi-1', productId: 'p1', variantId: null, quantity: 1 }],
+      });
+      prisma.cart.upsert.mockResolvedValue({ id: 'user-cart', couponId: null, items: [] });
+
+      await service.mergeGuestCartIntoUserCart('user-1', 'session-1');
+
+      expect(prisma.cart.update).toHaveBeenCalledWith({
+        where: { id: 'user-cart' },
+        data: { couponId: 'coupon-1' },
+      });
+    });
+
+    it('keeps the user cart coupon when it already has one', async () => {
+      prisma.cart.findUnique.mockResolvedValue({
+        id: 'guest-cart',
+        couponId: 'coupon-guest',
+        items: [{ id: 'gi-1', productId: 'p1', variantId: null, quantity: 1 }],
+      });
+      prisma.cart.upsert.mockResolvedValue({ id: 'user-cart', couponId: 'coupon-user', items: [] });
+
+      await service.mergeGuestCartIntoUserCart('user-1', 'session-1');
+
+      expect(prisma.cart.update).not.toHaveBeenCalled();
     });
   });
 });
