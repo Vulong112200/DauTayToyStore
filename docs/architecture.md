@@ -1,5 +1,41 @@
 # Architecture Decisions
 
+## Phase 3 — Order + Inventory management
+
+### The inventory reservation gap flagged in Phase 2 is now closed
+
+Phase 2's architecture notes flagged that checkout reserves stock (`quantityReserved`) but
+nothing ever released it on cancellation. `AdminOrdersService.updateStatus` now enforces an
+explicit state machine (`PENDING → CONFIRMED → PROCESSING → SHIPPED → DELIVERED → REFUNDED`,
+with `CANCELLED` reachable from any pre-shipped state) and ties inventory side effects to the
+two transitions that actually change physical stock reality: moving to `CANCELLED` decrements
+only `quantityReserved` (goods never left the warehouse, on-hand is untouched); moving to
+`SHIPPED` decrements both `quantityOnHand` and `quantityReserved` together (goods physically
+left). Verified end-to-end against Supabase: checkout → confirm → process → ship correctly
+moved on-hand stock down by the order quantity while reserved returned to its pre-order value;
+a separate checkout → cancel correctly released the reservation with on-hand untouched;
+invalid transitions (`PENDING → SHIPPED` directly, anything from a terminal `CANCELLED`) both
+return a real 400 from the live API, not just a theoretical guard clause.
+
+### Extracted `order-view.util.ts` before adding admin order detail
+
+Same rationale as `product-list.util.ts` in Phase 2: `AdminOrdersService.findById` needed to
+return the exact `OrderView` shape `OrdersService` already built for checkout/tracking/"my
+orders". The `ORDER_INCLUDE`/`toOrderView` pair moved out of `OrdersService` into a shared
+`order-view.util.ts` that both services import — one mapping to keep in sync, not two.
+
+### Inventory admin scope is product-level only, and low-stock filtering trades DB pagination for correctness
+
+`InventoryService` deliberately only lists `Inventory` rows where `productId` is set (skipping
+variant-level rows) — no seeded or admin-editable product uses variants yet, so a variant view
+would be dead UI. Separately, `lowStockOnly` can't be expressed as a Prisma `where` clause
+(comparing two computed columns — `quantityOnHand - quantityReserved <= lowStockThreshold` —
+isn't a supported filter), so that path fetches all matching rows, filters in memory, and
+paginates the *filtered* array instead of trusting the DB's `count()`. The alternative — filter
+in memory but keep the DB-computed `totalItems` — would silently mismatch `totalPages` against
+what's actually being paged through; verified live that toggling the threshold on/off correctly
+changes `totalItems` in the response, not just the visible rows.
+
 ## Phase 3 — Admin foundation + Product management
 
 ### Route group refactor: `(public)` vs `/admin`

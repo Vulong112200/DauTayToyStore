@@ -18,6 +18,7 @@ import { CatalogModule } from './modules/catalog/catalog.module';
 import { ContentModule } from './modules/content/content.module';
 import { DashboardModule } from './modules/dashboard/dashboard.module';
 import { HealthModule } from './modules/health/health.module';
+import { InventoryModule } from './modules/inventory/inventory.module';
 import { OrdersModule } from './modules/orders/orders.module';
 import { UsersModule } from './modules/users/users.module';
 import { WishlistModule } from './modules/wishlist/wishlist.module';
@@ -48,6 +49,7 @@ import { WishlistModule } from './modules/wishlist/wishlist.module';
     ContentModule,
     DashboardModule,
     HealthModule,
+    InventoryModule,
     OrdersModule,
     UsersModule,
     WishlistModule,

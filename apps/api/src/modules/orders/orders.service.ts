@@ -4,6 +4,7 @@ import type { CheckoutInput, OrderListItem, OrderView } from '@repo/contracts';
 import { CartIdentity } from '../../common/cart-identity/cart-identity';
 import { resolveAvailableStock } from '../../common/utils/inventory.util';
 import { PrismaService } from '../../infra/prisma/prisma.service';
+import { ORDER_VIEW_INCLUDE, toOrderView } from './order-view.util';
 import { generateOrderNumber } from './utils/order-number.util';
 
 /** Phase 2 shipping rule: flat fee below the free-shipping threshold. Real, configurable
@@ -32,16 +33,6 @@ const CART_ITEM_INCLUDE = {
     },
   },
 } satisfies Prisma.CartItemInclude;
-
-const ORDER_INCLUDE = {
-  items: {
-    include: { product: { select: { slug: true } } },
-    orderBy: { id: 'asc' },
-  },
-  statusHistory: { orderBy: { createdAt: 'asc' } },
-} satisfies Prisma.OrderInclude;
-
-type OrderWithRelations = Prisma.OrderGetPayload<{ include: typeof ORDER_INCLUDE }>;
 
 @Injectable()
 export class OrdersService {
@@ -109,7 +100,7 @@ export class OrdersService {
           statusHistory: { create: [{ status: 'PENDING', note: 'Đơn hàng đã được tạo' }] },
           payment: { create: { method: 'COD', status: 'PENDING', amount: total } },
         },
-        include: ORDER_INCLUDE,
+        include: ORDER_VIEW_INCLUDE,
       });
 
       for (const item of cart.items) {
@@ -131,7 +122,7 @@ export class OrdersService {
       return created;
     });
 
-    return this.toOrderView(order);
+    return toOrderView(order);
   }
 
   async listForUser(userId: string): Promise<OrderListItem[]> {
@@ -153,65 +144,26 @@ export class OrdersService {
   async getForUser(userId: string, orderNumber: string): Promise<OrderView> {
     const order = await this.prisma.order.findFirst({
       where: { orderNumber, userId },
-      include: ORDER_INCLUDE,
+      include: ORDER_VIEW_INCLUDE,
     });
 
     if (!order) {
       throw new NotFoundException('Không tìm thấy đơn hàng');
     }
 
-    return this.toOrderView(order);
+    return toOrderView(order);
   }
 
   async trackByNumberAndEmail(orderNumber: string, email: string): Promise<OrderView> {
     const order = await this.prisma.order.findFirst({
       where: { orderNumber, customerEmail: { equals: email, mode: 'insensitive' } },
-      include: ORDER_INCLUDE,
+      include: ORDER_VIEW_INCLUDE,
     });
 
     if (!order) {
       throw new NotFoundException('Không tìm thấy đơn hàng với thông tin đã cung cấp');
     }
 
-    return this.toOrderView(order);
-  }
-
-  private toOrderView(order: OrderWithRelations): OrderView {
-    return {
-      id: order.id,
-      orderNumber: order.orderNumber,
-      status: order.status,
-      subtotal: order.subtotal,
-      discountTotal: order.discountTotal,
-      shippingFee: order.shippingFee,
-      total: order.total,
-      customerName: order.customerName,
-      customerEmail: order.customerEmail,
-      customerPhone: order.customerPhone,
-      shippingAddress: {
-        line1: order.shippingLine1,
-        line2: order.shippingLine2,
-        ward: order.shippingWard,
-        district: order.shippingDistrict,
-        province: order.shippingProvince,
-        postalCode: order.shippingPostalCode,
-      },
-      note: order.note,
-      items: order.items.map((item) => ({
-        id: item.id,
-        productSlug: item.product.slug,
-        productName: item.productName,
-        sku: item.sku,
-        unitPrice: item.unitPrice,
-        quantity: item.quantity,
-        lineTotal: item.lineTotal,
-      })),
-      statusHistory: order.statusHistory.map((entry) => ({
-        status: entry.status,
-        note: entry.note,
-        createdAt: entry.createdAt.toISOString(),
-      })),
-      createdAt: order.createdAt.toISOString(),
-    };
+    return toOrderView(order);
   }
 }

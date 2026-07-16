@@ -2,12 +2,14 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { FolderTree, LayoutDashboard, Package, Tag } from 'lucide-react';
+import { Boxes, FolderTree, LayoutDashboard, Package, ShoppingBag, Tag } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const NAV_ITEMS = [
   { href: '/admin', label: 'Tổng quan', icon: LayoutDashboard },
+  { href: '/admin/orders', label: 'Đơn hàng', icon: ShoppingBag },
   { href: '/admin/products', label: 'Sản phẩm', icon: Package },
+  { href: '/admin/inventory', label: 'Tồn kho', icon: Boxes },
   { href: '/admin/categories', label: 'Danh mục', icon: FolderTree },
   { href: '/admin/brands', label: 'Thương hiệu', icon: Tag },
 ];

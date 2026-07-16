@@ -195,3 +195,63 @@ export const dashboardSummarySchema = z.object({
   recentOrders: z.array(dashboardRecentOrderSchema),
 });
 export type DashboardSummary = z.infer<typeof dashboardSummarySchema>;
+
+// ---------------------------------------------------------------------------
+// Admin orders
+// ---------------------------------------------------------------------------
+
+export const adminOrderListItemSchema = z.object({
+  id: z.string().uuid(),
+  orderNumber: z.string(),
+  customerName: z.string(),
+  customerEmail: z.string(),
+  status: orderStatusSchema,
+  total: z.number().int(),
+  itemCount: z.number().int(),
+  createdAt: z.string().datetime(),
+});
+export type AdminOrderListItem = z.infer<typeof adminOrderListItemSchema>;
+
+export const adminOrderQuerySchema = z.object({
+  page: z.coerce.number().int().min(1).default(1),
+  pageSize: z.coerce.number().int().min(1).max(100).default(20),
+  q: z.string().optional(),
+  status: orderStatusSchema.optional(),
+});
+export type AdminOrderQuery = z.infer<typeof adminOrderQuerySchema>;
+
+export const updateOrderStatusInputSchema = z.object({
+  status: orderStatusSchema,
+  note: z.string().max(500).optional(),
+});
+export type UpdateOrderStatusInput = z.infer<typeof updateOrderStatusInputSchema>;
+
+// ---------------------------------------------------------------------------
+// Admin inventory
+// ---------------------------------------------------------------------------
+
+export const adminInventoryItemSchema = z.object({
+  productId: z.string().uuid(),
+  productName: z.string(),
+  sku: z.string(),
+  primaryImageUrl: z.string().nullable(),
+  quantityOnHand: z.number().int(),
+  quantityReserved: z.number().int(),
+  availableStock: z.number().int(),
+  lowStockThreshold: z.number().int(),
+});
+export type AdminInventoryItem = z.infer<typeof adminInventoryItemSchema>;
+
+export const adminInventoryQuerySchema = z.object({
+  page: z.coerce.number().int().min(1).default(1),
+  pageSize: z.coerce.number().int().min(1).max(100).default(20),
+  q: z.string().optional(),
+  lowStockOnly: z.coerce.boolean().optional(),
+});
+export type AdminInventoryQuery = z.infer<typeof adminInventoryQuerySchema>;
+
+export const updateInventoryInputSchema = z.object({
+  quantityOnHand: z.number().int().min(0),
+  lowStockThreshold: z.number().int().min(0).optional(),
+});
+export type UpdateInventoryInput = z.infer<typeof updateInventoryInputSchema>;
