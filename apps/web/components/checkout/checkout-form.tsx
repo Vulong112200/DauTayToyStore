@@ -151,7 +151,7 @@ export function CheckoutForm() {
         </div>
 
         <Button type="submit" size="lg" className="w-full" disabled={checkout.isPending}>
-          {checkout.isPending ? 'Đang đặt hàng...' : `Đặt hàng (${formatVnd(cart.subtotal)})`}
+          {checkout.isPending ? 'Đang đặt hàng...' : `Đặt hàng (${formatVnd(cart.total)})`}
         </Button>
       </form>
 
@@ -171,6 +171,14 @@ export function CheckoutForm() {
           <span className="text-muted-foreground">Tạm tính ({cart.itemCount} sản phẩm)</span>
           <span className="font-medium">{formatVnd(cart.subtotal)}</span>
         </div>
+        {cart.couponCode && (
+          <div className="mt-1 flex justify-between text-sm">
+            <span className="text-muted-foreground">Mã giảm giá ({cart.couponCode})</span>
+            <span className="font-medium text-destructive">
+              -{formatVnd(cart.discountTotal)}
+            </span>
+          </div>
+        )}
         <p className="mt-2 text-xs text-muted-foreground">
           Phí vận chuyển sẽ được tính khi bạn xác nhận đặt hàng (miễn phí cho đơn từ 500.000₫).
         </p>

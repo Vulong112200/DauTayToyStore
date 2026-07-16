@@ -11,7 +11,9 @@ import {
   Package,
   ShoppingBag,
   Tag,
+  Ticket,
   Users,
+  Zap,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -22,6 +24,8 @@ const NAV_ITEMS = [
   { href: '/admin/inventory', label: 'Tồn kho', icon: Boxes },
   { href: '/admin/categories', label: 'Danh mục', icon: FolderTree },
   { href: '/admin/brands', label: 'Thương hiệu', icon: Tag },
+  { href: '/admin/coupons', label: 'Mã giảm giá', icon: Ticket },
+  { href: '/admin/flash-sales', label: 'Flash Sale', icon: Zap },
   { href: '/admin/blog', label: 'Bài viết', icon: Newspaper },
   { href: '/admin/blog-categories', label: 'Danh mục blog', icon: FolderTree },
   { href: '/admin/banners', label: 'Banner', icon: ImageIcon },

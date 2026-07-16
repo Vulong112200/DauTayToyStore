@@ -2,9 +2,11 @@ import { Body, Controller, Delete, Get, Param, Patch, Post, UseGuards } from '@n
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import {
   type AddCartItemInput,
+  type ApplyCartCouponInput,
   type CartView,
   type UpdateCartItemInput,
   addCartItemSchema,
+  applyCartCouponSchema,
   updateCartItemSchema,
 } from '@repo/contracts';
 import { CartIdentity } from '../../common/cart-identity/cart-identity';
@@ -53,5 +55,20 @@ export class CartController {
     @Param('itemId') itemId: string,
   ): Promise<CartView> {
     return this.cartService.removeItem(identity, itemId);
+  }
+
+  @Post('coupon')
+  @ApiOperation({ summary: 'Áp dụng mã giảm giá vào giỏ hàng' })
+  applyCoupon(
+    @CurrentCartIdentity() identity: CartIdentity,
+    @Body(new ZodValidationPipe(applyCartCouponSchema)) body: ApplyCartCouponInput,
+  ): Promise<CartView> {
+    return this.cartService.applyCoupon(identity, body.code);
+  }
+
+  @Delete('coupon')
+  @ApiOperation({ summary: 'Gỡ mã giảm giá khỏi giỏ hàng' })
+  removeCoupon(@CurrentCartIdentity() identity: CartIdentity): Promise<CartView> {
+    return this.cartService.removeCoupon(identity);
   }
 }

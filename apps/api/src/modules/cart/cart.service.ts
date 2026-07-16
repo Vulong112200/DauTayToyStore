@@ -2,6 +2,11 @@ import { BadRequestException, Injectable, NotFoundException } from '@nestjs/comm
 import { Prisma } from '@prisma/client';
 import type { AddCartItemInput, CartItemView, CartView } from '@repo/contracts';
 import { CartIdentity } from '../../common/cart-identity/cart-identity';
+import {
+  assertCouponGloballyUsable,
+  assertCouponUserUsable,
+  computeCouponDiscount,
+} from '../../common/utils/coupon.util';
 import { resolveAvailableStock } from '../../common/utils/inventory.util';
 import { PrismaService } from '../../infra/prisma/prisma.service';
 
@@ -157,6 +162,35 @@ export class CartService {
     return this.loadCartView(cart.id);
   }
 
+  async applyCoupon(identity: CartIdentity, code: string): Promise<CartView> {
+    const cart = await this.getOrCreateCart(identity);
+
+    const coupon = await this.prisma.coupon.findUnique({ where: { code } });
+    if (!coupon) {
+      throw new NotFoundException('Mã giảm giá không tồn tại');
+    }
+
+    const { subtotal } = await this.getItemViews(cart.id);
+    assertCouponGloballyUsable(coupon, subtotal);
+
+    if (identity.userId) {
+      const usedByUserCount = await this.prisma.order.count({
+        where: { couponId: coupon.id, userId: identity.userId },
+      });
+      assertCouponUserUsable(coupon, usedByUserCount);
+    }
+
+    await this.prisma.cart.update({ where: { id: cart.id }, data: { couponId: coupon.id } });
+
+    return this.loadCartView(cart.id);
+  }
+
+  async removeCoupon(identity: CartIdentity): Promise<CartView> {
+    const cart = await this.getOrCreateCart(identity);
+    await this.prisma.cart.update({ where: { id: cart.id }, data: { couponId: null } });
+    return this.loadCartView(cart.id);
+  }
+
   private async getOrCreateCart(identity: CartIdentity): Promise<{ id: string }> {
     if (identity.userId) {
       return this.prisma.cart.upsert({
@@ -179,7 +213,9 @@ export class CartService {
     throw new BadRequestException('Thiếu thông tin định danh giỏ hàng');
   }
 
-  private async loadCartView(cartId: string): Promise<CartView> {
+  private async getItemViews(
+    cartId: string,
+  ): Promise<{ views: CartItemView[]; subtotal: number }> {
     const items = await this.prisma.cartItem.findMany({
       where: { cartId },
       orderBy: { createdAt: 'asc' },
@@ -188,11 +224,38 @@ export class CartService {
 
     const views = items.map(toItemView);
 
+    return { views, subtotal: views.reduce((sum, item) => sum + item.lineTotal, 0) };
+  }
+
+  private async loadCartView(cartId: string): Promise<CartView> {
+    const cart = await this.prisma.cart.findUniqueOrThrow({
+      where: { id: cartId },
+      include: { coupon: true },
+    });
+    const { views, subtotal } = await this.getItemViews(cartId);
+
+    // Recomputed on every read rather than cached: if the cart contents shrink
+    // below the coupon's minOrderAmount (or the coupon's window/usage limit lapses)
+    // between apply and checkout, the discount silently drops to 0 without a
+    // separate "unapply" step — same tradeoff as re-validating stock at checkout.
+    let discountTotal = 0;
+    if (cart.coupon) {
+      try {
+        assertCouponGloballyUsable(cart.coupon, subtotal);
+        discountTotal = computeCouponDiscount(cart.coupon, subtotal);
+      } catch {
+        discountTotal = 0;
+      }
+    }
+
     return {
       id: cartId,
       items: views,
-      subtotal: views.reduce((sum, item) => sum + item.lineTotal, 0),
+      subtotal,
       itemCount: views.reduce((sum, item) => sum + item.quantity, 0),
+      couponCode: cart.coupon?.code ?? null,
+      discountTotal,
+      total: subtotal - discountTotal,
     };
   }
 }

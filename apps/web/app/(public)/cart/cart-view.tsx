@@ -1,16 +1,40 @@
 'use client';
 
+import * as React from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { Minus, Plus, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { useCart, useRemoveCartItem, useUpdateCartItem } from '@/hooks/use-cart';
+import { Input } from '@/components/ui/input';
+import {
+  useApplyCoupon,
+  useCart,
+  useRemoveCartItem,
+  useRemoveCoupon,
+  useUpdateCartItem,
+} from '@/hooks/use-cart';
+import { ApiError } from '@/lib/api-client';
 import { formatVnd } from '@/lib/utils';
 
 export function CartView() {
   const { data: cart, isLoading } = useCart();
   const updateItem = useUpdateCartItem();
   const removeItem = useRemoveCartItem();
+  const applyCoupon = useApplyCoupon();
+  const removeCoupon = useRemoveCoupon();
+  const [couponCode, setCouponCode] = React.useState('');
+  const [couponError, setCouponError] = React.useState<string | null>(null);
+
+  async function handleApplyCoupon(event: React.FormEvent) {
+    event.preventDefault();
+    setCouponError(null);
+    try {
+      await applyCoupon.mutateAsync({ code: couponCode });
+      setCouponCode('');
+    } catch (error) {
+      setCouponError(error instanceof ApiError ? error.message : 'Không thể áp dụng mã giảm giá');
+    }
+  }
 
   if (isLoading) {
     return <p className="text-muted-foreground">Đang tải giỏ hàng...</p>;
@@ -116,10 +140,53 @@ export function CartView() {
           <span className="text-muted-foreground">Tạm tính ({cart.itemCount} sản phẩm)</span>
           <span className="font-medium">{formatVnd(cart.subtotal)}</span>
         </div>
+
+        {cart.couponCode ? (
+          <div className="mt-2 flex items-center justify-between text-sm">
+            <span className="text-muted-foreground">
+              Mã giảm giá: <span className="font-medium text-foreground">{cart.couponCode}</span>
+            </span>
+            <button
+              type="button"
+              className="text-destructive hover:underline disabled:opacity-50"
+              disabled={removeCoupon.isPending}
+              onClick={() => removeCoupon.mutate()}
+            >
+              Gỡ mã
+            </button>
+          </div>
+        ) : (
+          <form onSubmit={handleApplyCoupon} className="mt-3 flex gap-2">
+            <Input
+              value={couponCode}
+              onChange={(event) => setCouponCode(event.target.value)}
+              placeholder="Nhập mã giảm giá"
+              aria-label="Mã giảm giá"
+              className="h-9 text-sm"
+            />
+            <Button
+              type="submit"
+              variant="outline"
+              size="sm"
+              disabled={applyCoupon.isPending || !couponCode.trim()}
+            >
+              Áp dụng
+            </Button>
+          </form>
+        )}
+        {couponError && <p className="mt-1 text-xs text-destructive">{couponError}</p>}
+
+        {cart.discountTotal > 0 && (
+          <div className="mt-2 flex justify-between text-sm">
+            <span className="text-muted-foreground">Giảm giá</span>
+            <span className="font-medium text-destructive">-{formatVnd(cart.discountTotal)}</span>
+          </div>
+        )}
+
         <div className="mt-6 border-t border-border pt-4">
           <div className="flex justify-between font-display text-lg font-bold">
             <span>Tổng cộng</span>
-            <span className="text-primary">{formatVnd(cart.subtotal)}</span>
+            <span className="text-primary">{formatVnd(cart.total)}</span>
           </div>
           <Button size="lg" className="mt-4 w-full" asChild>
             <Link href="/checkout">Tiến hành thanh toán</Link>

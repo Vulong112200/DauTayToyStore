@@ -411,3 +411,107 @@ export const adminBannerSchema = z.object({
   endsAt: z.string().datetime().nullable(),
 });
 export type AdminBanner = z.infer<typeof adminBannerSchema>;
+
+// --- Admin coupons ---
+
+export const couponTypeSchema = z.enum(['PERCENTAGE', 'FIXED_AMOUNT']);
+export type CouponType = z.infer<typeof couponTypeSchema>;
+
+const couponCodeSchema = z
+  .string()
+  .min(3, 'Mã quá ngắn')
+  .max(30)
+  .regex(/^[A-Z0-9_-]+$/, 'Mã chỉ gồm chữ hoa, số, gạch ngang và gạch dưới');
+
+export const couponInputSchema = z
+  .object({
+    code: couponCodeSchema,
+    description: z.string().max(300).optional(),
+    type: couponTypeSchema,
+    value: z.coerce.number().int().min(1),
+    minOrderAmount: z.coerce.number().int().min(0).optional(),
+    maxDiscountAmount: z.coerce.number().int().min(1).optional(),
+    usageLimit: z.coerce.number().int().min(1).optional(),
+    perUserLimit: z.coerce.number().int().min(1).optional(),
+    startsAt: z.string().datetime().optional(),
+    expiresAt: z.string().datetime().optional(),
+    isActive: z.boolean().default(true),
+  })
+  .refine((data) => data.type !== 'PERCENTAGE' || data.value <= 100, {
+    message: 'Giảm giá theo phần trăm không được vượt quá 100',
+    path: ['value'],
+  });
+export type CouponInput = z.infer<typeof couponInputSchema>;
+
+export const adminCouponSchema = z.object({
+  id: z.string().uuid(),
+  code: z.string(),
+  description: z.string().nullable(),
+  type: couponTypeSchema,
+  value: z.number().int(),
+  minOrderAmount: z.number().int().nullable(),
+  maxDiscountAmount: z.number().int().nullable(),
+  usageLimit: z.number().int().nullable(),
+  usageCount: z.number().int(),
+  perUserLimit: z.number().int().nullable(),
+  startsAt: z.string().datetime().nullable(),
+  expiresAt: z.string().datetime().nullable(),
+  isActive: z.boolean(),
+});
+export type AdminCoupon = z.infer<typeof adminCouponSchema>;
+
+export const adminCouponQuerySchema = z.object({
+  page: z.coerce.number().int().min(1).default(1),
+  pageSize: z.coerce.number().int().min(1).max(100).default(20),
+  q: z.string().optional(),
+});
+export type AdminCouponQuery = z.infer<typeof adminCouponQuerySchema>;
+
+// --- Admin flash sales ---
+
+export const flashSaleItemInputSchema = z.object({
+  productId: z.string().uuid(),
+  salePrice: z.coerce.number().int().min(1),
+  stockLimit: z.coerce.number().int().min(1).optional(),
+});
+export type FlashSaleItemInput = z.infer<typeof flashSaleItemInputSchema>;
+
+export const flashSaleInputSchema = z.object({
+  name: z.string().min(2, 'Tên quá ngắn').max(150),
+  startsAt: z.string().datetime(),
+  endsAt: z.string().datetime(),
+  isActive: z.boolean().default(true),
+  items: z.array(flashSaleItemInputSchema).min(1, 'Phải có ít nhất 1 sản phẩm'),
+});
+export type FlashSaleInput = z.infer<typeof flashSaleInputSchema>;
+
+export const adminFlashSaleItemSchema = z.object({
+  id: z.string().uuid(),
+  productId: z.string().uuid(),
+  productName: z.string(),
+  originalPrice: z.number().int(),
+  salePrice: z.number().int(),
+  stockLimit: z.number().int().nullable(),
+  soldCount: z.number().int(),
+});
+export type AdminFlashSaleItem = z.infer<typeof adminFlashSaleItemSchema>;
+
+export const adminFlashSaleListItemSchema = z.object({
+  id: z.string().uuid(),
+  name: z.string(),
+  startsAt: z.string().datetime(),
+  endsAt: z.string().datetime(),
+  isActive: z.boolean(),
+  itemCount: z.number().int(),
+});
+export type AdminFlashSaleListItem = z.infer<typeof adminFlashSaleListItemSchema>;
+
+export const adminFlashSaleDetailSchema = z.object({
+  id: z.string().uuid(),
+  name: z.string(),
+  startsAt: z.string().datetime(),
+  endsAt: z.string().datetime(),
+  isActive: z.boolean(),
+  items: z.array(adminFlashSaleItemSchema),
+});
+export type AdminFlashSaleDetail = z.infer<typeof adminFlashSaleDetailSchema>;

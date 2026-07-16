@@ -5,8 +5,9 @@ import { OrdersService } from './orders.service';
 describe('OrdersService', () => {
   let service: OrdersService;
   let prisma: {
-    cart: { findFirst: jest.Mock };
-    order: { create: jest.Mock; findMany: jest.Mock; findFirst: jest.Mock };
+    cart: { findFirst: jest.Mock; update: jest.Mock };
+    order: { create: jest.Mock; findMany: jest.Mock; findFirst: jest.Mock; count: jest.Mock };
+    coupon: { update: jest.Mock };
     inventory: { updateMany: jest.Mock };
     cartItem: { deleteMany: jest.Mock };
     $transaction: jest.Mock;
@@ -44,15 +45,18 @@ describe('OrdersService', () => {
 
   beforeEach(() => {
     prisma = {
-      cart: { findFirst: jest.fn() },
-      order: { create: jest.fn(), findMany: jest.fn(), findFirst: jest.fn() },
+      cart: { findFirst: jest.fn(), update: jest.fn() },
+      order: { create: jest.fn(), findMany: jest.fn(), findFirst: jest.fn(), count: jest.fn() },
+      coupon: { update: jest.fn() },
       inventory: { updateMany: jest.fn() },
       cartItem: { deleteMany: jest.fn() },
       $transaction: jest.fn(async (callback: (tx: unknown) => unknown) =>
         callback({
           order: { create: prisma.order.create },
+          coupon: { update: prisma.coupon.update },
           inventory: { updateMany: prisma.inventory.updateMany },
           cartItem: { deleteMany: prisma.cartItem.deleteMany },
+          cart: { update: prisma.cart.update },
         }),
       ),
     };
@@ -178,6 +182,86 @@ describe('OrdersService', () => {
 
       expect(prisma.order.create).toHaveBeenCalledWith(
         expect.objectContaining({ data: expect.objectContaining({ shippingFee: 0 }) }),
+      );
+    });
+
+    it('applies a valid cart coupon as a discount and increments its usage count', async () => {
+      prisma.cart.findFirst.mockResolvedValue({
+        ...cartWithItems([publishedItem()]),
+        coupon: {
+          id: 'c1',
+          type: 'FIXED_AMOUNT',
+          value: 20000,
+          isActive: true,
+          startsAt: null,
+          expiresAt: null,
+          minOrderAmount: null,
+          maxDiscountAmount: null,
+          usageLimit: null,
+          usageCount: 0,
+          perUserLimit: null,
+        },
+      });
+      prisma.order.create.mockResolvedValue({
+        id: 'order-3',
+        orderNumber: 'DTT00000003',
+        status: 'PENDING',
+        subtotal: 200000,
+        discountTotal: 20000,
+        shippingFee: 30000,
+        total: 210000,
+        customerName: checkoutInput.customerName,
+        customerEmail: checkoutInput.customerEmail,
+        customerPhone: checkoutInput.customerPhone,
+        shippingLine1: checkoutInput.shippingLine1,
+        shippingLine2: null,
+        shippingWard: null,
+        shippingDistrict: null,
+        shippingProvince: checkoutInput.shippingProvince,
+        shippingPostalCode: null,
+        note: null,
+        createdAt: new Date('2026-01-01'),
+        items: [],
+        statusHistory: [],
+      });
+
+      await service.checkout({ sessionId: 's1' }, checkoutInput);
+
+      expect(prisma.order.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ discountTotal: 20000, total: 210000, couponId: 'c1' }),
+        }),
+      );
+      expect(prisma.coupon.update).toHaveBeenCalledWith({
+        where: { id: 'c1' },
+        data: { usageCount: { increment: 1 } },
+      });
+      expect(prisma.cart.update).toHaveBeenCalledWith({
+        where: { id: 'cart-1' },
+        data: { couponId: null },
+      });
+    });
+
+    it('throws BadRequestException when the applied coupon has expired by checkout time', async () => {
+      prisma.cart.findFirst.mockResolvedValue({
+        ...cartWithItems([publishedItem()]),
+        coupon: {
+          id: 'c1',
+          type: 'FIXED_AMOUNT',
+          value: 20000,
+          isActive: true,
+          startsAt: null,
+          expiresAt: new Date('2020-01-01'),
+          minOrderAmount: null,
+          maxDiscountAmount: null,
+          usageLimit: null,
+          usageCount: 0,
+          perUserLimit: null,
+        },
+      });
+
+      await expect(service.checkout({ sessionId: 's1' }, checkoutInput)).rejects.toThrow(
+        BadRequestException,
       );
     });
   });

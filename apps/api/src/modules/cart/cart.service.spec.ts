@@ -7,7 +7,9 @@ describe('CartService', () => {
   let prisma: {
     product: { findUnique: jest.Mock };
     productVariant: { findUnique: jest.Mock };
-    cart: { upsert: jest.Mock };
+    coupon: { findUnique: jest.Mock };
+    order: { count: jest.Mock };
+    cart: { upsert: jest.Mock; update: jest.Mock; findUniqueOrThrow: jest.Mock };
     cartItem: {
       findFirst: jest.Mock;
       create: jest.Mock;
@@ -23,7 +25,13 @@ describe('CartService', () => {
     prisma = {
       product: { findUnique: jest.fn() },
       productVariant: { findUnique: jest.fn() },
-      cart: { upsert: jest.fn().mockResolvedValue(cart) },
+      coupon: { findUnique: jest.fn() },
+      order: { count: jest.fn() },
+      cart: {
+        upsert: jest.fn().mockResolvedValue(cart),
+        update: jest.fn(),
+        findUniqueOrThrow: jest.fn().mockResolvedValue({ ...cart, coupon: null }),
+      },
       cartItem: {
         findFirst: jest.fn(),
         create: jest.fn(),
@@ -151,6 +159,78 @@ describe('CartService', () => {
         where: { id: 'item-1', cartId: 'cart-1' },
       });
       expect(result.items).toEqual([]);
+    });
+  });
+
+  describe('applyCoupon', () => {
+    it('throws NotFoundException when the code does not exist', async () => {
+      prisma.coupon.findUnique.mockResolvedValue(null);
+
+      await expect(service.applyCoupon({ sessionId: 's1' }, 'MISSING')).rejects.toThrow(
+        NotFoundException,
+      );
+    });
+
+    it('throws BadRequestException when the coupon is inactive', async () => {
+      prisma.coupon.findUnique.mockResolvedValue({ code: 'OFF10', isActive: false });
+
+      await expect(service.applyCoupon({ sessionId: 's1' }, 'OFF10')).rejects.toThrow(
+        BadRequestException,
+      );
+    });
+
+    it('enforces perUserLimit only for authenticated users', async () => {
+      prisma.coupon.findUnique.mockResolvedValue({
+        id: 'c1',
+        code: 'OFF10',
+        isActive: true,
+        startsAt: null,
+        expiresAt: null,
+        minOrderAmount: null,
+        usageLimit: null,
+        usageCount: 0,
+        perUserLimit: 1,
+      });
+      prisma.order.count.mockResolvedValue(1);
+
+      await expect(service.applyCoupon({ userId: 'u1' }, 'OFF10')).rejects.toThrow(
+        BadRequestException,
+      );
+      expect(prisma.order.count).toHaveBeenCalledWith({
+        where: { couponId: 'c1', userId: 'u1' },
+      });
+    });
+
+    it('applies the coupon to the cart when usable', async () => {
+      prisma.coupon.findUnique.mockResolvedValue({
+        id: 'c1',
+        code: 'OFF10',
+        isActive: true,
+        startsAt: null,
+        expiresAt: null,
+        minOrderAmount: null,
+        usageLimit: null,
+        usageCount: 0,
+        perUserLimit: null,
+      });
+
+      await service.applyCoupon({ sessionId: 's1' }, 'OFF10');
+
+      expect(prisma.cart.update).toHaveBeenCalledWith({
+        where: { id: 'cart-1' },
+        data: { couponId: 'c1' },
+      });
+    });
+  });
+
+  describe('removeCoupon', () => {
+    it('clears the coupon from the cart', async () => {
+      await service.removeCoupon({ sessionId: 's1' });
+
+      expect(prisma.cart.update).toHaveBeenCalledWith({
+        where: { id: 'cart-1' },
+        data: { couponId: null },
+      });
     });
   });
 });

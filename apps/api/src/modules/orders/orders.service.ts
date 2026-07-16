@@ -2,6 +2,11 @@ import { BadRequestException, Injectable, NotFoundException } from '@nestjs/comm
 import { Prisma } from '@prisma/client';
 import type { CheckoutInput, OrderListItem, OrderView } from '@repo/contracts';
 import { CartIdentity } from '../../common/cart-identity/cart-identity';
+import {
+  assertCouponGloballyUsable,
+  assertCouponUserUsable,
+  computeCouponDiscount,
+} from '../../common/utils/coupon.util';
 import { resolveAvailableStock } from '../../common/utils/inventory.util';
 import { PrismaService } from '../../infra/prisma/prisma.service';
 import { ORDER_VIEW_INCLUDE, toOrderView } from './order-view.util';
@@ -41,7 +46,7 @@ export class OrdersService {
   async checkout(identity: CartIdentity, input: CheckoutInput): Promise<OrderView> {
     const cart = await this.prisma.cart.findFirst({
       where: identity.userId ? { userId: identity.userId } : { sessionId: identity.sessionId },
-      include: { items: { include: CART_ITEM_INCLUDE } },
+      include: { items: { include: CART_ITEM_INCLUDE }, coupon: true },
     });
 
     if (!cart || cart.items.length === 0) {
@@ -75,7 +80,22 @@ export class OrdersService {
 
     const subtotal = lines.reduce((sum, line) => sum + line.lineTotal, 0);
     const shippingFee = subtotal >= FREE_SHIPPING_THRESHOLD ? 0 : FLAT_SHIPPING_FEE;
-    const total = subtotal + shippingFee;
+
+    let discountTotal = 0;
+    if (cart.coupon) {
+      // Re-validate rather than trust what CartService checked at apply-time — the
+      // cart contents, the coupon's window, or its usage limit may have changed since.
+      assertCouponGloballyUsable(cart.coupon, subtotal);
+      if (identity.userId) {
+        const usedByUserCount = await this.prisma.order.count({
+          where: { couponId: cart.coupon.id, userId: identity.userId },
+        });
+        assertCouponUserUsable(cart.coupon, usedByUserCount);
+      }
+      discountTotal = computeCouponDiscount(cart.coupon, subtotal);
+    }
+
+    const total = subtotal + shippingFee - discountTotal;
 
     const order = await this.prisma.$transaction(async (tx) => {
       const created = await tx.order.create({
@@ -84,8 +104,10 @@ export class OrdersService {
           userId: identity.userId ?? null,
           status: 'PENDING',
           subtotal,
+          discountTotal,
           shippingFee,
           total,
+          couponId: cart.coupon?.id,
           customerEmail: input.customerEmail,
           customerPhone: input.customerPhone,
           customerName: input.customerName,
@@ -117,7 +139,15 @@ export class OrdersService {
         }
       }
 
+      if (cart.coupon) {
+        await tx.coupon.update({
+          where: { id: cart.coupon.id },
+          data: { usageCount: { increment: 1 } },
+        });
+      }
+
       await tx.cartItem.deleteMany({ where: { cartId: cart.id } });
+      await tx.cart.update({ where: { id: cart.id }, data: { couponId: null } });
 
       return created;
     });

@@ -1,4 +1,9 @@
-import type { AddCartItemInput, CartView, UpdateCartItemInput } from '@repo/contracts';
+import type {
+  AddCartItemInput,
+  ApplyCartCouponInput,
+  CartView,
+  UpdateCartItemInput,
+} from '@repo/contracts';
 import { apiFetch } from '../api-client';
 import { cartIdentityHeaders } from '../cart-headers';
 
@@ -20,4 +25,10 @@ export const cartApi = {
       method: 'DELETE',
       headers: cartIdentityHeaders(),
     }),
+
+  applyCoupon: (input: ApplyCartCouponInput) =>
+    apiFetch<CartView>('/cart/coupon', { body: input, headers: cartIdentityHeaders() }),
+
+  removeCoupon: () =>
+    apiFetch<CartView>('/cart/coupon', { method: 'DELETE', headers: cartIdentityHeaders() }),
 };

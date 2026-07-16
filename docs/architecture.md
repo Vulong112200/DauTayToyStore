@@ -1,5 +1,53 @@
 # Architecture Decisions
 
+## Phase 3 — Coupon + Flash Sale management
+
+### Scope: Coupon is fully wired end-to-end; Flash Sale is admin CRUD only
+
+Marketing has six models in the schema (Coupon, GiftVoucher, FlashSale, ComboDeal, BuyXGetYRule,
+FreeShippingRule) and none had any code at all before this slice — not even a `@repo/contracts`
+entry. Given the size, this slice deliberately covers only Coupon and FlashSale, and only Coupon
+is wired into Cart/Checkout for a real discount; FlashSale gets admin CRUD (create a sale window,
+attach `FlashSaleItem`s with a per-item `salePrice`) but nothing yet reads it to actually override
+a product's price on the storefront or in the cart — same holding pattern as Banner in the
+previous slice. GiftVoucher (no relation to Cart/Order at all in the schema), ComboDeal,
+BuyXGetYRule (whose `buyProductId`/`getProductId` are plain scalars with no FK, so referential
+integrity isn't even guaranteed at the DB level), and FreeShippingRule are left for a future slice.
+
+### Coupon validation split into two functions so per-user limits don't block guests
+
+`common/utils/coupon.util.ts` has `assertCouponGloballyUsable` (active flag, start/expiry window,
+`minOrderAmount`, `usageLimit` — all checkable from the coupon row and the cart's subtotal alone)
+and a separate `assertCouponUserUsable` (the `perUserLimit` check, which needs a count of the
+user's past orders against that coupon). Only the global check runs for guest carts — a guest
+has no stable identity to count past redemptions against, so `perUserLimit` is silently not
+enforced for guests. This is a known, documented gap rather than a bug: the alternative (blocking
+guest coupon use entirely, or keying the limit off the cart session id, which resets whenever
+`localStorage` is cleared) was judged worse than under-enforcing a marketing constraint.
+
+### Discount is recomputed on every cart read, not cached on the Cart row
+
+`Cart.couponId` is the only persisted state — `CartService.loadCartView` re-fetches the coupon
+and recomputes `discountTotal` from the *current* subtotal every time the cart is read. If the
+cart's contents drop below the coupon's `minOrderAmount`, or the coupon's active window lapses,
+between apply and checkout, the discount silently drops to 0 on the next read rather than
+throwing — there's no separate "coupon became invalid, please remove it" state. Checkout
+re-validates for real with `assertCouponGloballyUsable`/`assertCouponUserUsable` and throws if
+the coupon is no longer usable at that point, so a stale silent-0-discount at cart-read time can
+never leak into an order with an unexpectedly-applied discount that shouldn't have counted.
+Verified live: applying a coupon, then letting it expire (tested by creating one pre-expired),
+correctly 400s at apply-time; a coupon valid at apply-time but invalidated before checkout would
+400 there instead.
+
+### Checkout increments `usageCount` and clears `Cart.couponId` inside the order transaction
+
+Both happen in the same `$transaction` as order creation and inventory reservation — if the
+transaction rolls back, the coupon's usage count is not incremented and the cart's coupon stays
+attached, so a failed checkout can't silently consume a limited-use coupon. Verified live: a full
+checkout with `SALE50K` (FIXED_AMOUNT, 50,000₫) applied to an 890,000₫ cart produced an order
+with `discountTotal: 50000`, `total: 840000`; the coupon's `usageCount` incremented from 0 to 1;
+and the cart came back empty with `couponCode: null` on the next read.
+
 ## Phase 3 — Blog + Banner management
 
 ### Blog categories can be hard-deleted; blog posts can too — neither has a Restrict FK
