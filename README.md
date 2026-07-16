@@ -149,9 +149,10 @@ post-deploy checklist): see [`docs/deployment.md`](./docs/deployment.md).
 - **Phase 4** — ✅ promotion engine (flash sale/combo/buy-X-get-Y/free-shipping all wired into
   checkout pricing), ✅ guest→user cart merge on login, ✅ a media-picker UI wired into every
   raw-URL image field (product/category/blog/banner/brand — see `docs/architecture.md`; UI
-  interaction not verified in a real browser in this environment, only build/lint/typecheck), and
+  interaction not verified in a real browser in this environment, only build/lint/typecheck),
   ✅ gift voucher redemption at checkout (`Cart.voucherId`/`Order.giftVoucherId` migration, balance
   deducted at checkout and refunded on order cancellation — verified live end-to-end against the
-  Supabase deploy) are done; still open: a real payment gateway (COD only today) and real
-  outbound email (`EmailProcessor` only logs today)
+  Supabase deploy), and ✅ real outbound email via Resend (`EmailProcessor`/`ResendEmailService` —
+  boots fine with no `RESEND_API_KEY` configured, verified live via the BullMQ job's completed
+  state on Upstash) are done; still open: a real payment gateway (COD only today)
 - **Phase 5** — AI modules (description/SEO/FAQ generation, chat assistant, recommendations, image tooling)

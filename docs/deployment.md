@@ -22,6 +22,9 @@ Kiểm tra bạn đã có sẵn (nếu chưa, xem `docs/architecture.md` phần 
 - [ ] Supabase project — cần **2 connection string**: pooled (`DATABASE_URL`, port 6543) và direct (`DIRECT_URL`, port 5432)
 - [ ] Upstash Redis — 1 connection string (`REDIS_URL`, dạng `rediss://...`)
 - [ ] Cloudflare R2 bucket — `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET_NAME`, `R2_PUBLIC_URL` (domain public dạng `pub-xxxx.r2.dev`, **không phải** endpoint `*.r2.cloudflarestorage.com`)
+- [ ] Resend API key (tuỳ chọn — nếu muốn email quên mật khẩu thực sự gửi được) — tạo tại
+  [resend.com/api-keys](https://resend.com/api-keys), điền `RESEND_API_KEY`/`EMAIL_FROM`. Để trống
+  vẫn deploy được bình thường, chỉ là email sẽ không gửi thật (chỉ log cảnh báo)
 - [ ] Google OAuth Client ID/Secret (nếu dùng đăng nhập Google) — từ Google Cloud Console
 - [ ] 2 chuỗi bí mật JWT ngẫu nhiên, tối thiểu 32 ký tự mỗi chuỗi (`JWT_ACCESS_SECRET`, `JWT_REFRESH_SECRET`). Tạo nhanh:
   ```bash
@@ -94,6 +97,11 @@ R2_ACCESS_KEY_ID=<access key>
 R2_SECRET_ACCESS_KEY=<secret key>
 R2_BUCKET_NAME=dautaytoy-media
 R2_PUBLIC_URL=https://pub-xxxxxxxxxxxx.r2.dev
+
+# Email (Resend) — tuỳ chọn, để trống thì app vẫn chạy bình thường, chỉ là
+# email quên mật khẩu sẽ không thực sự được gửi (chỉ log cảnh báo)
+RESEND_API_KEY=<api key lấy từ resend.com/api-keys>
+EMAIL_FROM=DauTayToy Store <no-reply@your-domain.com>
 
 # Rate limiting (tuỳ chọn, có default hợp lý)
 THROTTLE_TTL_MS=60000

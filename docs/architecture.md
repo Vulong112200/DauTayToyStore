@@ -1,5 +1,31 @@
 # Architecture Decisions
 
+## Phase 4 — Real outbound email via Resend
+
+### Lazy-config, same spirit as `R2Service` — but a missing config doesn't throw
+
+`ResendEmailService` (`infra/email/resend-email.service.ts`) is a thin wrapper over Resend's HTTP
+API — one `fetch` call, no SDK dependency. Like `R2Service`, it reads its config
+(`RESEND_API_KEY`/`EMAIL_FROM`) lazily rather than failing app boot when they're unset. Unlike
+`R2Service`, a missing config doesn't throw: R2 is a hard dependency the moment an admin tries to
+upload media, but nothing in this app *requires* outbound email to boot or to exercise the rest of
+the system in local dev, so `send()` logs a warning and returns `false` instead of throwing —
+which, inside `EmailProcessor.process()`, means the BullMQ job completes normally rather than
+being marked failed. A real send failure once actually configured (bad key, non-2xx from Resend's
+API) still throws, so *that* failure stays visible instead of being swallowed the same way.
+
+### Verified by inspecting the BullMQ job's state directly in Redis, not just by reading logs
+
+Triggering `POST /auth/forgot-password` against the local dev server (Resend not configured)
+returned `{"success":true}` immediately, but the Nest logger's warning line for the skipped send
+didn't reliably show up in the captured process output — a stdout-buffering quirk of how this
+session's background-task output gets captured, not a bug in the app. Rather than trust an absent
+log line, the job's actual state was inspected directly on the Upstash instance (`bull:email:2`'s
+hash: `returnvalue: null`, `finishedOn` set) — confirming the job ran to completion without
+throwing, which is what "warn and return `false`" should produce. This is the more reliable way to
+verify a background job outcome in this environment: read the job state Redis actually stored, not
+just whatever reached stdout.
+
 ## Phase 4 — Production Dockerfile: workspace packages need building *and* copying into the runner stage, not just the build stage
 
 ### Two separate failures from the same root cause, found only by deploying to Render

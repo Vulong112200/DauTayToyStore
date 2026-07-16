@@ -30,6 +30,10 @@ export function buildConfiguration(env: EnvConfig) {
       bucketName: env.R2_BUCKET_NAME,
       publicUrl: env.R2_PUBLIC_URL,
     },
+    email: {
+      resendApiKey: env.RESEND_API_KEY,
+      from: env.EMAIL_FROM,
+    },
     throttle: {
       ttlMs: env.THROTTLE_TTL_MS,
       limit: env.THROTTLE_LIMIT,

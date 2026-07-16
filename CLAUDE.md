@@ -174,8 +174,12 @@ server component that only exports `metadata` plus a co-located `'use client'` f
 keep `'use client'` scoped as small as possible while still getting server-rendered metadata.
 
 **Background jobs**: `QueueModule` registers `email`/`media`/`ai` BullMQ queues against Redis;
-only `email` has a consumer (`EmailProcessor`), currently logging instead of calling a real
-provider.
+only `email` has a consumer (`EmailProcessor`). It sends through Resend's HTTP API via
+`ResendEmailService` (`infra/email/`) — a lazy-config wrapper in the same spirit as `R2Service`,
+except a missing `RESEND_API_KEY`/`EMAIL_FROM` doesn't throw (outbound email is optional in local
+dev the way nothing else depends on it booting): `send()` logs a warning and returns `false`
+instead of failing the BullMQ job, while a real send failure (bad key, non-2xx from Resend) still
+throws so that failure is visible instead of silently swallowed.
 
 **Money**: all prices are `Int` VND (no minor currency unit), so price arithmetic is plain
 integer math — no cents/decimal handling anywhere. Frontend formats via
@@ -183,12 +187,10 @@ integer math — no cents/decimal handling anywhere. Frontend formats via
 
 ## TODO before production deploy
 
-- **Leaked Supabase credential in `apps/api/.env.example`**: line with `DIRECT_URL` contains a
-  real password (`db.tqpbdaszqlxhtrnqnvgs.supabase.co`), not a placeholder. Rotate that DB
-  password on Supabase first, then replace the line with a placeholder like the `DATABASE_URL`
-  line above it. Do this before any deploy or public push, not after.
-- **`EmailProcessor` only logs, doesn't send real email** — forgot-password will silently not
-  deliver on production until a real provider (SES/Resend/etc.) is wired in.
+- **Set `RESEND_API_KEY`/`EMAIL_FROM` on the Render deploy** — `EmailProcessor` now actually sends
+  through Resend (`infra/email/resend-email.service.ts`) instead of only logging, but only once
+  those two env vars are set; until then, sends are skipped with a logged warning rather than
+  failing the job (see the Background jobs paragraph above).
 - **Change the seeded admin password** (`admin@dautaytoystore.vn` / `Admin@123456`) before
   seeding any shared/production environment.
 - After fixing the above and actually deploying, **update this file's "Project" section and this
