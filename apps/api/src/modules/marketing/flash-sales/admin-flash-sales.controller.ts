@@ -8,6 +8,7 @@ import {
   flashSaleInputSchema,
 } from '@repo/contracts';
 import { AuditLog } from '../../../common/decorators/audit-log.decorator';
+import { RequirePermissions } from '../../../common/decorators/require-permissions.decorator';
 import { Roles } from '../../../common/decorators/roles.decorator';
 import { ZodValidationPipe } from '../../../common/pipes/zod-validation.pipe';
 import { AdminFlashSalesService } from './admin-flash-sales.service';
@@ -34,6 +35,7 @@ export class AdminFlashSalesController {
 
   @Post()
   @Roles(RoleName.ADMIN, RoleName.SUPER_ADMIN)
+  @RequirePermissions('marketing:manage')
   @ApiOperation({ summary: '[Admin] Tạo flash sale mới' })
   create(
     @Body(new ZodValidationPipe(flashSaleInputSchema)) body: FlashSaleInput,
@@ -43,6 +45,7 @@ export class AdminFlashSalesController {
 
   @Patch(':id')
   @Roles(RoleName.ADMIN, RoleName.SUPER_ADMIN)
+  @RequirePermissions('marketing:manage')
   @ApiOperation({ summary: '[Admin] Cập nhật flash sale' })
   update(
     @Param('id') id: string,
@@ -53,6 +56,7 @@ export class AdminFlashSalesController {
 
   @Delete(':id')
   @Roles(RoleName.ADMIN, RoleName.SUPER_ADMIN)
+  @RequirePermissions('marketing:manage')
   @ApiOperation({ summary: '[Admin] Xoá flash sale' })
   async remove(@Param('id') id: string): Promise<{ success: true }> {
     await this.adminFlashSalesService.remove(id);

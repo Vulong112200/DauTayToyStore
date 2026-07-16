@@ -11,6 +11,7 @@ import {
   updateOrderStatusInputSchema,
 } from '@repo/contracts';
 import { AuditLog } from '../../common/decorators/audit-log.decorator';
+import { RequirePermissions } from '../../common/decorators/require-permissions.decorator';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe';
 import { AdminOrdersService } from './admin-orders.service';
@@ -19,6 +20,7 @@ import { AdminOrdersService } from './admin-orders.service';
 @ApiBearerAuth()
 @Controller('admin/orders')
 @Roles(RoleName.ADMIN, RoleName.SUPER_ADMIN, RoleName.STAFF)
+@RequirePermissions('order:read')
 @AuditLog('Order')
 export class AdminOrdersController {
   constructor(private readonly adminOrdersService: AdminOrdersService) {}
@@ -38,6 +40,7 @@ export class AdminOrdersController {
   }
 
   @Patch(':id/status')
+  @RequirePermissions('order:update')
   @ApiOperation({ summary: '[Admin] Cập nhật trạng thái đơn hàng' })
   updateStatus(
     @Param('id') id: string,

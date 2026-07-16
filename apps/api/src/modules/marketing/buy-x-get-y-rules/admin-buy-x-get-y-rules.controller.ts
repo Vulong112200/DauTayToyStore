@@ -7,6 +7,7 @@ import {
   buyXGetYRuleInputSchema,
 } from '@repo/contracts';
 import { AuditLog } from '../../../common/decorators/audit-log.decorator';
+import { RequirePermissions } from '../../../common/decorators/require-permissions.decorator';
 import { Roles } from '../../../common/decorators/roles.decorator';
 import { ZodValidationPipe } from '../../../common/pipes/zod-validation.pipe';
 import { AdminBuyXGetYRulesService } from './admin-buy-x-get-y-rules.service';
@@ -27,6 +28,7 @@ export class AdminBuyXGetYRulesController {
 
   @Post()
   @Roles(RoleName.ADMIN, RoleName.SUPER_ADMIN)
+  @RequirePermissions('marketing:manage')
   @ApiOperation({ summary: '[Admin] Tạo chương trình mua X tặng Y' })
   create(
     @Body(new ZodValidationPipe(buyXGetYRuleInputSchema)) body: BuyXGetYRuleInput,
@@ -36,6 +38,7 @@ export class AdminBuyXGetYRulesController {
 
   @Patch(':id')
   @Roles(RoleName.ADMIN, RoleName.SUPER_ADMIN)
+  @RequirePermissions('marketing:manage')
   @ApiOperation({ summary: '[Admin] Cập nhật chương trình mua X tặng Y' })
   update(
     @Param('id') id: string,
@@ -46,6 +49,7 @@ export class AdminBuyXGetYRulesController {
 
   @Delete(':id')
   @Roles(RoleName.ADMIN, RoleName.SUPER_ADMIN)
+  @RequirePermissions('marketing:manage')
   @ApiOperation({ summary: '[Admin] Xoá chương trình mua X tặng Y' })
   async remove(@Param('id') id: string): Promise<{ success: true }> {
     await this.adminBuyXGetYRulesService.remove(id);

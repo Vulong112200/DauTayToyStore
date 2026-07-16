@@ -80,9 +80,18 @@ method level runs the pipe against *every* param (custom param decorators like
 hash in `RefreshToken` for revocation/rotation (every refresh rotates and marks the old one
 `revokedAt`/`replacedBy`). Google login verifies an ID token server-side
 (`google-auth-library`), no OAuth redirect flow. Every route is protected by default via a
-global `JwtAuthGuard`; `@Public()` opts a route out. RBAC (`Role`/`Permission`, both seeded) is
-checked at the role level today (`RolesGuard`); permission-level checks are wired into the
-schema but not yet enforced.
+global `JwtAuthGuard`; `@Public()` opts a route out. RBAC is checked at both the role level
+(`RolesGuard`/`@Roles()`) and, additively, the permission level (`PermissionsGuard`/
+`@RequirePermissions()`, `common/guards/permissions.guard.ts`) — a route with no
+`@RequirePermissions()` is unaffected, gated by `@Roles()` alone exactly as before.
+`JwtStrategy.validate` resolves both `roles` and a flattened, deduped `permissions: string[]`
+(every role's `RolePermission.permission.key`) fresh from the DB on every request, the same place
+`roles` was already resolved. `@RequirePermissions()` is applied only where the seeded
+role→permission mapping produces *identical* effective access to the existing `@Roles()` gating
+(Products/Orders/Users fully; Marketing's write endpoints only) — see `docs/architecture.md` for
+two spots deliberately left unenforced because the seed data disagrees with current `@Roles()`
+behavior (Settings, and read access on Marketing), flagged there for a product decision rather
+than silently changing who can access what.
 
 **Cart identity**: carts work for both guests and logged-in users. `CartIdentityGuard`
 (`common/cart-identity/`, not inside `modules/cart` — it's shared with Orders/checkout) tries a

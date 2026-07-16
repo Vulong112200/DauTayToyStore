@@ -15,6 +15,7 @@ import {
 } from '@repo/contracts';
 import { AuditLog } from '../../common/decorators/audit-log.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import { RequirePermissions } from '../../common/decorators/require-permissions.decorator';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe';
 import { AuthenticatedUser } from '../auth/types/authenticated-user';
@@ -24,6 +25,7 @@ import { AdminUsersService } from './admin-users.service';
 @ApiBearerAuth()
 @Controller('admin/users')
 @Roles(RoleName.ADMIN, RoleName.SUPER_ADMIN)
+@RequirePermissions('user:read')
 @AuditLog('User')
 export class AdminUsersController {
   constructor(private readonly adminUsersService: AdminUsersService) {}
@@ -43,6 +45,7 @@ export class AdminUsersController {
   }
 
   @Post()
+  @RequirePermissions('user:manage')
   @ApiOperation({ summary: '[Admin] Tạo tài khoản mới (nhân viên/quản trị)' })
   create(
     @CurrentUser() actor: AuthenticatedUser,
@@ -52,6 +55,7 @@ export class AdminUsersController {
   }
 
   @Patch(':id')
+  @RequirePermissions('user:manage')
   @ApiOperation({ summary: '[Admin] Cập nhật thông tin/vô hiệu hoá người dùng' })
   update(
     @CurrentUser() actor: AuthenticatedUser,
@@ -62,6 +66,7 @@ export class AdminUsersController {
   }
 
   @Patch(':id/roles')
+  @RequirePermissions('user:manage')
   @ApiOperation({ summary: '[Admin] Gán lại vai trò cho người dùng' })
   updateRoles(
     @CurrentUser() actor: AuthenticatedUser,

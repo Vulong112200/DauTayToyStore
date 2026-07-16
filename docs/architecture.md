@@ -1,5 +1,92 @@
 # Architecture Decisions
 
+## Phase 4 — Permission-level RBAC enforcement (`PermissionsGuard`)
+
+### Additive, not a replacement — `@RequirePermissions()` only tightens what `@Roles()` already gates
+
+`PermissionsGuard` (`common/guards/permissions.guard.ts`) is registered as an `APP_GUARD` *after*
+`RolesGuard` in `app.module.ts`. A route with no `@RequirePermissions()` metadata is completely
+unaffected — `getAllAndOverride` returns `undefined`/`[]` and the guard passes through, so
+`RolesGuard` alone still decides access exactly as it did before this slice. `permissions:
+string[]` is resolved in `JwtStrategy.validate` the same way `roles` already was: one extra
+`include` on the existing per-request `prisma.user.findUnique` (roles → role → permissions →
+permission), flattened into a deduped array — no new DB round-trip, no JWT payload change (the
+access token itself still only carries `{ sub, email }`; roles/permissions are always resolved
+live, so revoking a role or permission takes effect on the user's very next request without
+needing a token refresh).
+
+### Enforcement was applied only where it's provably a no-op against current behavior
+
+The `Permission`/`RolePermission` tables were seeded back in the Phase 3 Coupon+FlashSale slice
+(`prisma/seed.ts`'s `PERMISSIONS`/`ROLE_PERMISSIONS`) but never read by any guard until now — the
+seed data and the hand-written `@Roles()` decorators on each admin controller were two parallel,
+never-cross-checked descriptions of "who can do what." Before wiring `PermissionsGuard` in
+anywhere, every admin controller's `@Roles()` gating was compared against what the seed grants
+that same set of roles. `@RequirePermissions()` was added **only** where the two already agreed
+exactly, so enforcing it changes nothing for real users — it just makes today's *de facto* rule
+into an explicitly-checked one:
+
+- **Products** (`admin-products.controller.ts`) — full coverage: `product:read` (class-level,
+  covers both `GET`s), `product:create`/`product:update`/`product:delete` on the respective
+  mutating routes. Seed grants `STAFF` exactly `product:read`+`product:update` (no create/delete),
+  matching the controller's existing method-level `@Roles()` overrides exactly.
+- **Orders** (`admin-orders.controller.ts`) — full coverage: `order:read` (class-level),
+  `order:update` on `PATCH :id/status`. `STAFF` has both in the seed and both are already
+  role-gated identically (no method override needed on either side).
+- **Users** (`admin-users.controller.ts`) — full coverage: `user:read` (class-level, moot in
+  practice since `@Roles()` already excludes `STAFF` from this controller entirely, but kept for
+  correctness/forward-compatibility), `user:manage` on create/update/`updateRoles`.
+- **Marketing — write endpoints only** (`coupons`/`flash-sales`/`combo-deals`/
+  `buy-x-get-y-rules`/`free-shipping-rules`/`gift-vouchers` controllers): `marketing:manage` added
+  to every `POST`/`PATCH`/`DELETE`, which already excluded `STAFF` via a method-level `@Roles()`
+  override identical to `ADMIN`+`SUPER_ADMIN` — matches the seed (`STAFF` has no marketing
+  permission at all).
+
+### Two spots deliberately left unenforced — seed data disagrees with current `@Roles()`, flagged for a decision rather than resolved unilaterally
+
+Two real discrepancies surfaced while doing the comparison above. Both are cases where enforcing
+the seeded permission would have *changed* real access for real roles, which is a product/security
+policy call, not a refactor — so neither was wired in, and both are recorded here instead:
+
+1. **`AdminSettingsController`**: `PATCH /admin/settings` currently allows `ADMIN`+`SUPER_ADMIN`
+   (`@Roles(RoleName.ADMIN, RoleName.SUPER_ADMIN)`), but the seed deliberately excludes `ADMIN`
+   from `settings:manage` (`ROLE_PERMISSIONS.ADMIN` filters it out — the *only* permission key
+   `ADMIN` doesn't hold). Enforcing `settings:manage` here would newly block `ADMIN` from changing
+   site settings. `GET /admin/settings` has the same problem in reverse: it currently allows
+   `STAFF` to read settings via the class-level `@Roles()`, but there's no `settings:read` key in
+   the seed at all (only the SUPER_ADMIN-only `settings:manage`), so enforcing anything on the
+   `GET` would block `STAFF`'s current read access.
+2. **Marketing read endpoints** (the `GET`s on all six marketing controllers): currently allowed
+   for `STAFF` via the class-level `@Roles()`, but the seed's only marketing key is
+   `marketing:manage`, which `STAFF` doesn't hold — there's no `marketing:read` key. Enforcing
+   `marketing:manage` on these `GET`s (the same permission already correctly applied to the write
+   endpoints) would newly block `STAFF` from viewing coupons/flash sales/etc., which they can do
+   today.
+
+Both are left on role-only gating (unchanged behavior) until it's decided whether: (a) `ADMIN`
+should keep settings access and `STAFF` should keep settings/marketing read access — in which case
+the fix is additive seed changes (new `settings:read`/`marketing:read` keys granted to the
+relevant roles, and/or adding `settings:manage` back to `ADMIN`'s list), or (b) the seed's stricter
+intent is actually correct and today's `@Roles()` should be *tightened* to match it (a real access
+reduction for `ADMIN`/`STAFF` that would need sign-off first, since it changes what currently-
+deployed admin accounts can do).
+
+### A `curl`/bash encoding bug corrupted a live product's Vietnamese text during verification — caught and fixed, not a code bug
+
+Verifying `PermissionsGuard` live meant having a real `STAFF` account update a real product
+through the real API (`PATCH /admin/products/:id`) to prove `product:update` is actually read from
+the DB, not just unit-mocked. The verification script round-tripped the product's current detail
+through a bash command substitution + `node -e` pipeline on Windows, which mangled every Vietnamese
+diacritic in the body before it was sent back (`Xe cứu hỏa` → `Xe c?u h?a`) — and the API,
+correctly, saved exactly what it was sent. This was an artifact of the *shell test scaffolding*
+(Windows console code page vs. UTF-8 round-tripping through `bash -c`/command substitution), not
+of `ZodValidationPipe`, Prisma, or Postgres, all of which handle UTF-8 correctly when the bytes
+arrive intact. Fixed by writing a small Node script (via the file-writing tool, not a shell
+heredoc) that used `fetch`/`JSON.stringify` end-to-end with the correct source strings pulled back
+from `prisma/seed.ts`, verified against the public product-detail endpoint afterward. Lesson for
+future live verification in this environment: prefer a Node/fetch script file over bash
+pipelines/command substitution whenever a request body contains non-ASCII text.
+
 ## Phase 4 — Real outbound email via Resend
 
 ### Lazy-config, same spirit as `R2Service` — but a missing config doesn't throw

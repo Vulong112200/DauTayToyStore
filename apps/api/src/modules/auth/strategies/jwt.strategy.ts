@@ -28,17 +28,27 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
   async validate(payload: AccessTokenPayload): Promise<AuthenticatedUser> {
     const user = await this.prisma.user.findUnique({
       where: { id: payload.sub },
-      include: { roles: { include: { role: true } } },
+      include: {
+        roles: { include: { role: { include: { permissions: { include: { permission: true } } } } } },
+      },
     });
 
     if (!user || !user.isActive) {
       throw new UnauthorizedException('Tài khoản không hợp lệ hoặc đã bị vô hiệu hoá');
     }
 
+    const permissions = new Set<string>();
+    for (const userRole of user.roles) {
+      for (const rolePermission of userRole.role.permissions) {
+        permissions.add(rolePermission.permission.key);
+      }
+    }
+
     return {
       id: user.id,
       email: user.email,
       roles: user.roles.map((userRole) => userRole.role.name) as RoleName[],
+      permissions: [...permissions],
     };
   }
 }

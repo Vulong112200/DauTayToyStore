@@ -12,6 +12,7 @@ import {
   updateGiftVoucherInputSchema,
 } from '@repo/contracts';
 import { AuditLog } from '../../../common/decorators/audit-log.decorator';
+import { RequirePermissions } from '../../../common/decorators/require-permissions.decorator';
 import { Roles } from '../../../common/decorators/roles.decorator';
 import { ZodValidationPipe } from '../../../common/pipes/zod-validation.pipe';
 import { AdminGiftVouchersService } from './admin-gift-vouchers.service';
@@ -34,6 +35,7 @@ export class AdminGiftVouchersController {
 
   @Post()
   @Roles(RoleName.ADMIN, RoleName.SUPER_ADMIN)
+  @RequirePermissions('marketing:manage')
   @ApiOperation({ summary: '[Admin] Tạo phiếu quà tặng mới' })
   create(
     @Body(new ZodValidationPipe(giftVoucherInputSchema)) body: GiftVoucherInput,
@@ -43,6 +45,7 @@ export class AdminGiftVouchersController {
 
   @Patch(':id')
   @Roles(RoleName.ADMIN, RoleName.SUPER_ADMIN)
+  @RequirePermissions('marketing:manage')
   @ApiOperation({ summary: '[Admin] Cập nhật phiếu quà tặng' })
   update(
     @Param('id') id: string,
@@ -53,6 +56,7 @@ export class AdminGiftVouchersController {
 
   @Delete(':id')
   @Roles(RoleName.ADMIN, RoleName.SUPER_ADMIN)
+  @RequirePermissions('marketing:manage')
   @ApiOperation({ summary: '[Admin] Xoá phiếu quà tặng' })
   async remove(@Param('id') id: string): Promise<{ success: true }> {
     await this.adminGiftVouchersService.remove(id);

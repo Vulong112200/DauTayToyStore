@@ -8,6 +8,7 @@ import {
   comboDealInputSchema,
 } from '@repo/contracts';
 import { AuditLog } from '../../../common/decorators/audit-log.decorator';
+import { RequirePermissions } from '../../../common/decorators/require-permissions.decorator';
 import { Roles } from '../../../common/decorators/roles.decorator';
 import { ZodValidationPipe } from '../../../common/pipes/zod-validation.pipe';
 import { AdminComboDealsService } from './admin-combo-deals.service';
@@ -34,6 +35,7 @@ export class AdminComboDealsController {
 
   @Post()
   @Roles(RoleName.ADMIN, RoleName.SUPER_ADMIN)
+  @RequirePermissions('marketing:manage')
   @ApiOperation({ summary: '[Admin] Tạo combo mới' })
   create(
     @Body(new ZodValidationPipe(comboDealInputSchema)) body: ComboDealInput,
@@ -43,6 +45,7 @@ export class AdminComboDealsController {
 
   @Patch(':id')
   @Roles(RoleName.ADMIN, RoleName.SUPER_ADMIN)
+  @RequirePermissions('marketing:manage')
   @ApiOperation({ summary: '[Admin] Cập nhật combo' })
   update(
     @Param('id') id: string,
@@ -53,6 +56,7 @@ export class AdminComboDealsController {
 
   @Delete(':id')
   @Roles(RoleName.ADMIN, RoleName.SUPER_ADMIN)
+  @RequirePermissions('marketing:manage')
   @ApiOperation({ summary: '[Admin] Xoá combo' })
   async remove(@Param('id') id: string): Promise<{ success: true }> {
     await this.adminComboDealsService.remove(id);

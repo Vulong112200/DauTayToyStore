@@ -152,7 +152,11 @@ post-deploy checklist): see [`docs/deployment.md`](./docs/deployment.md).
   interaction not verified in a real browser in this environment, only build/lint/typecheck),
   ✅ gift voucher redemption at checkout (`Cart.voucherId`/`Order.giftVoucherId` migration, balance
   deducted at checkout and refunded on order cancellation — verified live end-to-end against the
-  Supabase deploy), and ✅ real outbound email via Resend (`EmailProcessor`/`ResendEmailService` —
+  Supabase deploy), ✅ real outbound email via Resend (`EmailProcessor`/`ResendEmailService` —
   boots fine with no `RESEND_API_KEY` configured, verified live via the BullMQ job's completed
-  state on Upstash) are done; still open: a real payment gateway (COD only today)
+  state on Upstash), and ✅ permission-level RBAC enforcement (`PermissionsGuard`/
+  `@RequirePermissions()`, additive on top of `@Roles()` — see `docs/architecture.md` for two
+  spots deliberately left unenforced pending a product decision: `AdminSettingsController` and
+  Marketing's read endpoints, where the seeded permission data disagrees with today's `@Roles()`)
+  are done; still open: a real payment gateway (COD only today)
 - **Phase 5** — AI modules (description/SEO/FAQ generation, chat assistant, recommendations, image tooling)

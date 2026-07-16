@@ -7,6 +7,7 @@ import {
   freeShippingRuleInputSchema,
 } from '@repo/contracts';
 import { AuditLog } from '../../../common/decorators/audit-log.decorator';
+import { RequirePermissions } from '../../../common/decorators/require-permissions.decorator';
 import { Roles } from '../../../common/decorators/roles.decorator';
 import { ZodValidationPipe } from '../../../common/pipes/zod-validation.pipe';
 import { AdminFreeShippingRulesService } from './admin-free-shipping-rules.service';
@@ -27,6 +28,7 @@ export class AdminFreeShippingRulesController {
 
   @Post()
   @Roles(RoleName.ADMIN, RoleName.SUPER_ADMIN)
+  @RequirePermissions('marketing:manage')
   @ApiOperation({ summary: '[Admin] Tạo quy tắc miễn phí vận chuyển' })
   create(
     @Body(new ZodValidationPipe(freeShippingRuleInputSchema)) body: FreeShippingRuleInput,
@@ -36,6 +38,7 @@ export class AdminFreeShippingRulesController {
 
   @Patch(':id')
   @Roles(RoleName.ADMIN, RoleName.SUPER_ADMIN)
+  @RequirePermissions('marketing:manage')
   @ApiOperation({ summary: '[Admin] Cập nhật quy tắc miễn phí vận chuyển' })
   update(
     @Param('id') id: string,
@@ -46,6 +49,7 @@ export class AdminFreeShippingRulesController {
 
   @Delete(':id')
   @Roles(RoleName.ADMIN, RoleName.SUPER_ADMIN)
+  @RequirePermissions('marketing:manage')
   @ApiOperation({ summary: '[Admin] Xoá quy tắc miễn phí vận chuyển' })
   async remove(@Param('id') id: string): Promise<{ success: true }> {
     await this.adminFreeShippingRulesService.remove(id);

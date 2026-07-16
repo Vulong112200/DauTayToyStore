@@ -11,6 +11,7 @@ import {
   productInputSchema,
 } from '@repo/contracts';
 import { AuditLog } from '../../../common/decorators/audit-log.decorator';
+import { RequirePermissions } from '../../../common/decorators/require-permissions.decorator';
 import { Roles } from '../../../common/decorators/roles.decorator';
 import { ZodValidationPipe } from '../../../common/pipes/zod-validation.pipe';
 import { AdminProductsService } from './admin-products.service';
@@ -19,6 +20,7 @@ import { AdminProductsService } from './admin-products.service';
 @ApiBearerAuth()
 @Controller('admin/products')
 @Roles(RoleName.ADMIN, RoleName.SUPER_ADMIN, RoleName.STAFF)
+@RequirePermissions('product:read')
 @AuditLog('Product')
 export class AdminProductsController {
   constructor(private readonly adminProductsService: AdminProductsService) {}
@@ -39,6 +41,7 @@ export class AdminProductsController {
 
   @Post()
   @Roles(RoleName.ADMIN, RoleName.SUPER_ADMIN)
+  @RequirePermissions('product:create')
   @ApiOperation({ summary: '[Admin] Tạo sản phẩm mới' })
   create(
     @Body(new ZodValidationPipe(productInputSchema)) body: ProductInput,
@@ -47,6 +50,7 @@ export class AdminProductsController {
   }
 
   @Patch(':id')
+  @RequirePermissions('product:update')
   @ApiOperation({ summary: '[Admin] Cập nhật sản phẩm' })
   update(
     @Param('id') id: string,
@@ -57,6 +61,7 @@ export class AdminProductsController {
 
   @Delete(':id')
   @Roles(RoleName.ADMIN, RoleName.SUPER_ADMIN)
+  @RequirePermissions('product:delete')
   @ApiOperation({ summary: '[Admin] Lưu trữ (ẩn) sản phẩm' })
   async remove(@Param('id') id: string): Promise<{ success: true }> {
     await this.adminProductsService.remove(id);

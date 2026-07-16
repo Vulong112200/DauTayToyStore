@@ -10,6 +10,7 @@ import {
   couponInputSchema,
 } from '@repo/contracts';
 import { AuditLog } from '../../../common/decorators/audit-log.decorator';
+import { RequirePermissions } from '../../../common/decorators/require-permissions.decorator';
 import { Roles } from '../../../common/decorators/roles.decorator';
 import { ZodValidationPipe } from '../../../common/pipes/zod-validation.pipe';
 import { AdminCouponsService } from './admin-coupons.service';
@@ -32,6 +33,7 @@ export class AdminCouponsController {
 
   @Post()
   @Roles(RoleName.ADMIN, RoleName.SUPER_ADMIN)
+  @RequirePermissions('marketing:manage')
   @ApiOperation({ summary: '[Admin] Tạo mã giảm giá mới' })
   create(
     @Body(new ZodValidationPipe(couponInputSchema)) body: CouponInput,
@@ -41,6 +43,7 @@ export class AdminCouponsController {
 
   @Patch(':id')
   @Roles(RoleName.ADMIN, RoleName.SUPER_ADMIN)
+  @RequirePermissions('marketing:manage')
   @ApiOperation({ summary: '[Admin] Cập nhật mã giảm giá' })
   update(
     @Param('id') id: string,
@@ -51,6 +54,7 @@ export class AdminCouponsController {
 
   @Delete(':id')
   @Roles(RoleName.ADMIN, RoleName.SUPER_ADMIN)
+  @RequirePermissions('marketing:manage')
   @ApiOperation({ summary: '[Admin] Xoá mã giảm giá' })
   async remove(@Param('id') id: string): Promise<{ success: true }> {
     await this.adminCouponsService.remove(id);
