@@ -21,8 +21,10 @@ import { DashboardModule } from './modules/dashboard/dashboard.module';
 import { HealthModule } from './modules/health/health.module';
 import { InventoryModule } from './modules/inventory/inventory.module';
 import { MarketingModule } from './modules/marketing/marketing.module';
+import { MediaModule } from './modules/media/media.module';
 import { OrdersModule } from './modules/orders/orders.module';
 import { ReportsModule } from './modules/reports/reports.module';
+import { SettingsModule } from './modules/settings/settings.module';
 import { UsersModule } from './modules/users/users.module';
 import { WishlistModule } from './modules/wishlist/wishlist.module';
 
@@ -54,8 +56,10 @@ import { WishlistModule } from './modules/wishlist/wishlist.module';
     HealthModule,
     InventoryModule,
     MarketingModule,
+    MediaModule,
     OrdersModule,
     ReportsModule,
+    SettingsModule,
     UsersModule,
     WishlistModule,
   ],

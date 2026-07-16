@@ -25,19 +25,26 @@
     "seed": "ts-node --transpile-only prisma/seed.ts"
   },
   "jest": {
-    "moduleFileExtensions": ["js", "json", "ts"],
+    "moduleFileExtensions": [
+      "js",
+      "json",
+      "ts"
+    ],
     "rootDir": "src",
     "testRegex": ".*\\.spec\\.ts$",
     "transform": {
       "^.+\\.(t|j)s$": "ts-jest"
     },
-    "collectCoverageFrom": ["**/*.(t|j)s"],
+    "collectCoverageFrom": [
+      "**/*.(t|j)s"
+    ],
     "coverageDirectory": "../coverage",
     "testEnvironment": "node"
   },
   "dependencies": {
-    "@nestjs/common": "^10.4.15",
+    "@aws-sdk/client-s3": "^3.1088.0",
     "@nestjs/bullmq": "^10.2.3",
+    "@nestjs/common": "^10.4.15",
     "@nestjs/config": "^3.3.0",
     "@nestjs/core": "^10.4.15",
     "@nestjs/jwt": "^10.2.0",
@@ -47,6 +54,7 @@
     "@nestjs/terminus": "^10.2.3",
     "@nestjs/throttler": "^6.3.0",
     "@prisma/client": "^6.1.0",
+    "@repo/contracts": "workspace:*",
     "argon2": "^0.41.1",
     "bullmq": "^5.34.6",
     "class-transformer": "^0.5.1",
@@ -61,8 +69,7 @@
     "passport-jwt": "^4.0.1",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.1",
-    "zod": "^3.24.1",
-    "@repo/contracts": "workspace:*"
+    "zod": "^3.24.1"
   },
   "devDependencies": {
     "@nestjs/cli": "^10.4.9",
@@ -74,6 +81,7 @@
     "@types/cookie-parser": "^1.4.8",
     "@types/express": "^5.0.0",
     "@types/jest": "^29.5.14",
+    "@types/multer": "^2.2.0",
     "@types/node": "^22.10.2",
     "@types/passport-jwt": "^4.0.1",
     "@types/supertest": "^6.0.2",

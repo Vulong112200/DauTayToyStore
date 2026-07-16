@@ -56,3 +56,25 @@ export async function apiFetch<TResponse>(
 
   return payload as TResponse;
 }
+
+/** Separate from apiFetch because multipart/form-data needs the browser to set its own
+ * Content-Type (with the multipart boundary) — apiFetch always forces application/json. */
+export async function apiUpload<TResponse>(path: string, formData: FormData): Promise<TResponse> {
+  const accessToken = useAuthStore.getState().tokens?.accessToken;
+
+  const response = await fetch(`${env.apiUrl}${path}`, {
+    method: 'POST',
+    headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined,
+    body: formData,
+    cache: 'no-store',
+  });
+
+  const contentType = response.headers.get('content-type') ?? '';
+  const payload = contentType.includes('application/json') ? await response.json() : undefined;
+
+  if (!response.ok) {
+    throw new ApiError(response.status, extractMessage(payload));
+  }
+
+  return payload as TResponse;
+}

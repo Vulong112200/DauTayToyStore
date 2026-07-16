@@ -11,6 +11,7 @@ import {
   LayoutDashboard,
   Newspaper,
   Package,
+  Settings,
   ShoppingBag,
   Tag,
   Ticket,
@@ -31,9 +32,11 @@ const NAV_ITEMS = [
   { href: '/admin/blog', label: 'Bài viết', icon: Newspaper },
   { href: '/admin/blog-categories', label: 'Danh mục blog', icon: FolderTree },
   { href: '/admin/banners', label: 'Banner', icon: ImageIcon },
+  { href: '/admin/media', label: 'Thư viện media', icon: ImageIcon },
   { href: '/admin/users', label: 'Người dùng', icon: Users },
   { href: '/admin/reports', label: 'Báo cáo', icon: BarChart3 },
   { href: '/admin/audit-logs', label: 'Nhật ký hệ thống', icon: History },
+  { href: '/admin/settings', label: 'Cấu hình', icon: Settings },
 ];
 
 export function AdminSidebar() {

@@ -9,13 +9,9 @@ import {
 } from '../../common/utils/coupon.util';
 import { resolveAvailableStock } from '../../common/utils/inventory.util';
 import { PrismaService } from '../../infra/prisma/prisma.service';
+import { AdminSettingsService } from '../settings/admin-settings.service';
 import { ORDER_VIEW_INCLUDE, toOrderView } from './order-view.util';
 import { generateOrderNumber } from './utils/order-number.util';
-
-/** Phase 2 shipping rule: flat fee below the free-shipping threshold. Real, configurable
- * FreeShippingRule-based logic lands in Phase 4 alongside the rest of the marketing engine. */
-const FREE_SHIPPING_THRESHOLD = 500_000;
-const FLAT_SHIPPING_FEE = 30_000;
 
 const CART_ITEM_INCLUDE = {
   product: {
@@ -41,7 +37,10 @@ const CART_ITEM_INCLUDE = {
 
 @Injectable()
 export class OrdersService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly adminSettingsService: AdminSettingsService,
+  ) {}
 
   async checkout(identity: CartIdentity, input: CheckoutInput): Promise<OrderView> {
     const cart = await this.prisma.cart.findFirst({
@@ -79,7 +78,8 @@ export class OrdersService {
     });
 
     const subtotal = lines.reduce((sum, line) => sum + line.lineTotal, 0);
-    const shippingFee = subtotal >= FREE_SHIPPING_THRESHOLD ? 0 : FLAT_SHIPPING_FEE;
+    const { freeShippingThreshold, flatShippingFee } = await this.adminSettingsService.getSettings();
+    const shippingFee = subtotal >= freeShippingThreshold ? 0 : flatShippingFee;
 
     let discountTotal = 0;
     if (cart.coupon) {

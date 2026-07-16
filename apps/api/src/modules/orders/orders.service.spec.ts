@@ -1,9 +1,11 @@
 import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../infra/prisma/prisma.service';
+import { AdminSettingsService } from '../settings/admin-settings.service';
 import { OrdersService } from './orders.service';
 
 describe('OrdersService', () => {
   let service: OrdersService;
+  let adminSettingsService: { getSettings: jest.Mock };
   let prisma: {
     cart: { findFirst: jest.Mock; update: jest.Mock };
     order: { create: jest.Mock; findMany: jest.Mock; findFirst: jest.Mock; count: jest.Mock };
@@ -60,7 +62,17 @@ describe('OrdersService', () => {
         }),
       ),
     };
-    service = new OrdersService(prisma as unknown as PrismaService);
+    adminSettingsService = {
+      getSettings: jest.fn().mockResolvedValue({
+        siteName: 'DauTayToy Store',
+        freeShippingThreshold: 500_000,
+        flatShippingFee: 30_000,
+      }),
+    };
+    service = new OrdersService(
+      prisma as unknown as PrismaService,
+      adminSettingsService as unknown as AdminSettingsService,
+    );
   });
 
   describe('checkout', () => {

@@ -1,5 +1,61 @@
 # Architecture Decisions
 
+## Phase 3 — Media Library + Settings
+
+### R2Service constructs its S3 client lazily, so booting without R2 credentials never fails
+
+`R2_ACCOUNT_ID`/`R2_ACCESS_KEY_ID`/`R2_SECRET_ACCESS_KEY` were already scaffolded in
+`AppConfiguration.r2` (Phase 1) but never actually used until this slice, and in this dev
+environment they're still unset. Constructing an `S3Client` at app startup (e.g. in a
+constructor or `onModuleInit`) would either throw or silently hold invalid credentials; instead
+`R2Service.getClient()` builds the client on first actual use (`upload`/`remove`) and throws a
+clear `InternalServerErrorException` naming the missing env vars if credentials aren't present.
+This means the whole app boots fine with R2 unconfigured — only the upload endpoint itself fails,
+with an actionable message instead of an opaque AWS SDK error. Verified live: `POST
+/admin/media` with no R2 credentials configured returns exactly that message; every other route
+(including `GET /admin/media`, which never touches R2) works normally.
+
+### No image dimension probing — `width`/`height` stay null
+
+`MediaAsset.width`/`height` exist in the schema but nothing here populates them; that would need
+an image-decoding library (e.g. `image-size`) that isn't installed, and the admin UI doesn't
+currently need it for anything (no responsive `srcset` generation, no aspect-ratio-aware crop
+tool). Left null and documented rather than adding a dependency for an unused field.
+
+### Every existing image field is still a raw URL text input — no MediaPicker wiring in this slice
+
+Product images, blog cover images, banner images, brand logos, category images are all plain
+`z.string().url()` text fields today (verified across every existing admin form). This slice
+ships the library itself (upload, browse, copy URL, delete) but does not retrofit a "pick from
+library" affordance into those existing forms — an admin uploads a file here, copies its URL,
+and pastes it into the existing text field, same manual step as pasting any other external image
+URL today. Wiring a `<MediaPicker>` into every existing form is real UI work left for a later
+pass; scoping it out kept this slice to "the library exists and works," not "every image field
+across the whole admin now opens it."
+
+### Settings is a single JSON blob under one `Setting` row, not one row per field
+
+`Setting.key` is already the table's primary key (flat key→JSON store), so the natural per-field
+approach would be one row per setting (`key: 'siteName'`, `key: 'freeShippingThreshold'`, ...).
+Instead `AdminSettingsService` stores the entire `SiteSettings` object under a single `key:
+'site'` row, merges it over `DEFAULT_SETTINGS` on every read, and does a read-merge-write on
+every partial update. This trades "one query per setting" flexibility (not needed — nothing
+reads a single setting in isolation) for "one row to reason about, one migration-free way to add
+a new field" (a new `SiteSettings` field just needs a default in `DEFAULT_SETTINGS`, no schema
+change). `SettingsModule` is `@Global()`, matching `AuditLogModule`'s precedent, so any module
+can inject `AdminSettingsService` without an explicit import.
+
+### Settings actually replaces the hardcoded shipping constants in checkout, not just a form
+
+`OrdersService.checkout` previously had `FREE_SHIPPING_THRESHOLD = 500_000` and `FLAT_SHIPPING_FEE
+= 30_000` as module-level constants (flagged in Phase 2's architecture notes as a stopgap).
+`OrdersService` now injects `AdminSettingsService` and reads `freeShippingThreshold`/
+`flatShippingFee` from it on every checkout — same default values, but now a live, admin-editable
+setting instead of a hardcoded constant. Verified live: raising `freeShippingThreshold` past a
+test cart's subtotal correctly switched it from free shipping to the configured
+`flatShippingFee`, and a changed `flatShippingFee` value showed up in the very next checkout's
+`shippingFee`/`total` with no restart.
+
 ## Phase 3 — Audit Logs + Reports
 
 ### A generic, decorator-driven interceptor replaces per-service `record()` calls

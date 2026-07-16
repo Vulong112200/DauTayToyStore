@@ -573,3 +573,47 @@ export const orderStatusBreakdownItemSchema = z.object({
   count: z.number().int(),
 });
 export type OrderStatusBreakdownItem = z.infer<typeof orderStatusBreakdownItemSchema>;
+
+// --- Admin media ---
+
+export const mediaTypeSchema = z.enum(['IMAGE', 'VIDEO', 'DOCUMENT']);
+export type MediaType = z.infer<typeof mediaTypeSchema>;
+
+export const adminMediaAssetSchema = z.object({
+  id: z.string().uuid(),
+  key: z.string(),
+  url: z.string(),
+  type: mediaTypeSchema,
+  mimeType: z.string(),
+  sizeBytes: z.number().int(),
+  width: z.number().int().nullable(),
+  height: z.number().int().nullable(),
+  altText: z.string().nullable(),
+  createdAt: z.string().datetime(),
+});
+export type AdminMediaAsset = z.infer<typeof adminMediaAssetSchema>;
+
+export const adminMediaQuerySchema = z.object({
+  page: z.coerce.number().int().min(1).default(1),
+  pageSize: z.coerce.number().int().min(1).max(100).default(24),
+  type: mediaTypeSchema.optional(),
+});
+export type AdminMediaQuery = z.infer<typeof adminMediaQuerySchema>;
+
+// --- Admin settings ---
+
+export const siteSettingsSchema = z.object({
+  siteName: z.string().min(1, 'Tên cửa hàng không được để trống').max(150),
+  contactEmail: z.string().email('Email không hợp lệ').optional(),
+  contactPhone: z
+    .string()
+    .regex(/^(0|\+84)(\d{9,10})$/, 'Số điện thoại không hợp lệ')
+    .optional(),
+  facebookUrl: z.string().url('URL không hợp lệ').optional(),
+  freeShippingThreshold: z.coerce.number().int().min(0),
+  flatShippingFee: z.coerce.number().int().min(0),
+});
+export type SiteSettings = z.infer<typeof siteSettingsSchema>;
+
+export const updateSiteSettingsSchema = siteSettingsSchema.partial();
+export type UpdateSiteSettingsInput = z.infer<typeof updateSiteSettingsSchema>;
