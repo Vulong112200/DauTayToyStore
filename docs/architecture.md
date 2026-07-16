@@ -1,5 +1,83 @@
 # Architecture Decisions
 
+## Phase 4 — Production Dockerfile: workspace packages need building *and* copying into the runner stage, not just the build stage
+
+### Two separate failures from the same root cause, found only by deploying to Render
+
+`apps/api/Dockerfile`'s `build` stage `COPY`s `packages/contracts` (TS source) and `apps/api`, then
+ran `nest build` directly — this compiled fine locally (via `pnpm dev`/`turbo run build`, which
+always builds `@repo/contracts` first per the "Build order matters" rule above) but failed in
+Docker with 83 `TS2307: Cannot find module '@repo/contracts'` errors, because the Dockerfile never
+ran `@repo/contracts`'s own `tsc` build — `dist/index.js` (what `package.json#main` points at)
+never existed. Fixed by adding `RUN pnpm --filter @repo/contracts run build` before `nest build`.
+
+That got the `build` stage green, but the `runner` stage then failed *at container start* (not
+build time) with `Cannot find module '@repo/contracts'` — the `runner` stage only copied
+`apps/api/dist` and `node_modules`, never `packages/contracts` itself. In pnpm's workspace layout,
+`apps/api/node_modules/@repo/contracts` is a symlink to `/repo/packages/contracts`, not a real
+directory — copying `apps/api/node_modules` copies the symlink, but its target has to exist too.
+Fixed by also `COPY`ing `packages/contracts/dist` and `packages/contracts/package.json` into the
+`runner` stage at the same absolute path.
+
+That still weren't enough: `@repo/contracts/dist/common/pagination.js` bare-`require("zod")`s, and
+`zod` (a dependency of `@repo/contracts`, not of `apps/api` or the repo root) lives in pnpm's
+per-package `node_modules/zod` symlink (`packages/contracts/node_modules/zod` →
+`/repo/node_modules/.pnpm/zod@.../node_modules/zod`), not hoisted to `/repo/node_modules/zod`
+directly. The final fix also copies `packages/contracts/node_modules` into the `runner` stage.
+Verified by grepping the compiled `dist/` output for every bare `require(...)` call rather than
+guessing — confirmed `@repo/contracts` is the only workspace package `apps/api/dist` requires at
+runtime, and `zod` is the only bare dependency `@repo/contracts/dist` requires, so no further
+`COPY` lines were needed beyond these three.
+
+## Phase 4 — Gift voucher redemption wired into cart/checkout
+
+### Closes the gap flagged in "Phase 3 — Remaining marketing entities" below
+
+That section explicitly deferred `GiftVoucher` because it "has zero relation from `Cart`/`Order`
+to `GiftVoucher`... wiring redemption in would mean a schema migration, not just service code."
+This slice is exactly that migration: `Cart.voucherId` + `Order.giftVoucherId`/
+`Order.giftVoucherAmount`, plus back-relations (`carts`/`orders`) on `GiftVoucher` itself.
+
+### Voucher is store credit, not a price discount — deliberately kept out of `discountTotal`
+
+Every other promotion (flash sale, combo, BOGO, coupon) reduces the price of what's being bought.
+A gift voucher instead pays down what's owed, same as a partial payment — conceptually closer to
+`Payment` than to `Coupon`. Folding it into `discountTotal` would have made an order's discount
+number mean "how much cheaper this order was," which a voucher redemption doesn't answer; keeping
+`giftVoucherAmount` as its own column preserves that distinction and required no change to how
+`discountTotal` itself is computed (still `promotionDiscountTotal + couponDiscount`, unchanged).
+
+### Applied after the coupon, and after the free-shipping threshold check — not before
+
+`OrdersService.checkout` computes `netSubtotalAfterCoupon` first, resolves free shipping against
+*that* number, and only then subtracts the voucher. Two consequences, both deliberate: a voucher
+can never be spent to push an order below the free-shipping threshold (the threshold check runs
+before the voucher is even considered), and a voucher never covers the shipping fee itself (it's
+subtracted from the merchandise subtotal, with `shippingFee` added back afterward). `CartService`'s
+live-preview math in `loadCartView` mirrors this exact order so the cart total never disagrees with
+what checkout produces, same guarantee the promotion engine already provides for the other
+discount types.
+
+### Balance is re-validated and decremented inside the checkout transaction, mirroring flash-sale stock
+
+`CartService.redeemVoucher`/`loadCartView` check the voucher's balance/active/expiry at
+apply-and-preview time, but `OrdersService.checkout` re-fetches the voucher row *inside* the
+`$transaction` and re-checks before decrementing — same pragmatic best-effort race-condition
+guard already used for `FlashSaleItem.soldCount` (not `SERIALIZABLE` isolation, acceptable at this
+system's scale). `redeemedAt` is stamped only when the balance reaches exactly 0, not on first use,
+since a voucher can be partially spent across (theoretically) more than one checkout attempt if a
+prior one failed after preview but before this transaction committed.
+
+### Cancelling an order refunds the voucher balance — new symmetry with the existing inventory-release logic
+
+`AdminOrdersService.updateStatus`'s `CANCELLED` branch already released reserved-but-unshipped
+inventory (a Phase 2 gap closed in Phase 3). This slice adds the same idea for vouchers: cancelling
+increments `GiftVoucher.balance` back by `Order.giftVoucherAmount` and clears `redeemedAt` to
+`null`, so a cancelled order can never leave a customer's voucher permanently drained for goods
+they never received. Verified live: redeemed a voucher (balance 50,000 → 0, `redeemedAt` stamped),
+checked out, then cancelled the resulting order — balance correctly returned to 50,000 and
+`redeemedAt` cleared back to `null`.
+
 ## Phase 4 — Media picker wired into every raw-URL image field
 
 ### Additive, not a replacement — the text input stays

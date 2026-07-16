@@ -142,14 +142,16 @@ post-deploy checklist): see [`docs/deployment.md`](./docs/deployment.md).
 - ✅ **Phase 1** — monorepo, database, auth (JWT + refresh + RBAC + Google OAuth)
 - ✅ **Phase 2** — customer-facing pages (catalog, cart, checkout, order tracking, wishlist, profile, blog, etc.)
 - ✅ **Phase 3** — admin panel: products/categories/brands, orders/inventory, users/roles,
-  blog/banners, marketing (coupon, flash sale, combo deal, buy-X-get-Y, and free-shipping rule are
-  all wired into a shared promotion engine at cart/checkout — see `docs/architecture.md`; gift
-  voucher is admin CRUD only, redemption needs a schema migration), audit logs, reports, media
-  library (Cloudflare R2, verified live), site settings
+  blog/banners, marketing (coupon, flash sale, combo deal, buy-X-get-Y, free-shipping rule, and
+  gift voucher are all wired into a shared promotion engine at cart/checkout — see
+  `docs/architecture.md`), audit logs, reports, media library (Cloudflare R2, verified live), site
+  settings
 - **Phase 4** — ✅ promotion engine (flash sale/combo/buy-X-get-Y/free-shipping all wired into
-  checkout pricing), ✅ guest→user cart merge on login, and ✅ a media-picker UI wired into every
+  checkout pricing), ✅ guest→user cart merge on login, ✅ a media-picker UI wired into every
   raw-URL image field (product/category/blog/banner/brand — see `docs/architecture.md`; UI
-  interaction not verified in a real browser in this environment, only build/lint/typecheck)
-  are done; still open: gift voucher redemption at checkout (needs a `Cart`/`Order` →
-  `GiftVoucher` migration); a real payment gateway (COD only today)
+  interaction not verified in a real browser in this environment, only build/lint/typecheck), and
+  ✅ gift voucher redemption at checkout (`Cart.voucherId`/`Order.giftVoucherId` migration, balance
+  deducted at checkout and refunded on order cancellation — verified live end-to-end against the
+  Supabase deploy) are done; still open: a real payment gateway (COD only today) and real
+  outbound email (`EmailProcessor` only logs today)
 - **Phase 5** — AI modules (description/SEO/FAQ generation, chat assistant, recommendations, image tooling)

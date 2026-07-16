@@ -44,7 +44,16 @@ which bundles `src` directly. `pnpm dev`/`turbo run build` handle this automatic
 (`turbo.json`: `dev`/`build`/`lint`/`typecheck` all `dependsOn: ["^build"]`). Only run `pnpm
 turbo run build --filter=@repo/contracts --filter=@repo/ui` manually if invoking `nest start` or
 `next dev` directly instead of through the root scripts — otherwise you'll hit module resolution
-errors that look unrelated to whatever you changed.
+errors that look unrelated to whatever you changed. `apps/api/Dockerfile`'s production build hits
+this same requirement twice over: the `build` stage must explicitly `pnpm --filter @repo/contracts
+run build` before `nest build` (a plain `COPY packages/contracts` of the TS source isn't enough —
+`nest build`'s `tsc` needs `dist/index.js` to already exist to resolve the import), and the final
+`runner` stage must separately `COPY` both `packages/contracts/dist` *and*
+`packages/contracts/node_modules` (pnpm's per-package `node_modules/zod` symlink, not hoisted to
+the repo root) — omitting either one builds fine but fails at container start with `Cannot find
+module '@repo/contracts'` or `Cannot find module 'zod'` respectively, since `node_modules/@repo/
+contracts` in the running image is a symlink to `/repo/packages/contracts` and that target must
+actually exist in the `runner` stage, not just the `build` stage.
 
 ## Architecture
 
@@ -126,17 +135,22 @@ order it turns into. Application order is fixed: flash sale overrides a line's u
 then combos greedily claim whole item-sets from a per-product "unclaimed quantity" pool, then
 BuyXGetYRule claims from what's left (so a unit already spent on a combo can't also be a BOGO
 freebie), then Coupon's discount is computed against the resulting `netSubtotal`, then
-`resolveFreeShipping()` checks both `Settings.freeShippingThreshold` and any matching
-`FreeShippingRule` (amount + optional province match) — shipping is free if *either* says so.
-`FlashSaleItem.soldCount` is the only side-effecting counter (incremented inside the checkout
-transaction, re-checked against `stockLimit` right before the increment — same pragmatic
-best-effort concurrency tradeoff as inventory reservation, not `SERIALIZABLE`). Combo/BuyXGetY/
-FreeShipping have no such counter — they're pure price calculations, nothing to persist beyond
-the order's `discountTotal` (which now folds *both* Coupon and automatic-promotion discounts into
-one number — there wasn't room to track them separately without a schema change). `GiftVoucher`
-is still admin-CRUD-only: it has no `Cart`/`Order` relation in the schema at all (unlike `Coupon`,
-which had `couponId` FKs scaffolded since Phase 1), so redemption needs a migration, not just
-service code — left for later.
+`GiftVoucher` (a redeemable store-credit balance, not a price discount) is deducted from what's
+left after the coupon, then `resolveFreeShipping()` checks both `Settings.freeShippingThreshold`
+and any matching `FreeShippingRule` (amount + optional province match) — shipping is free if
+*either* says so, evaluated on the coupon-adjusted total *before* the voucher is subtracted, so a
+voucher can never be used to game the free-shipping threshold, and a voucher never covers the
+shipping fee itself. `FlashSaleItem.soldCount` is the only side-effecting counter tied to pricing
+(incremented inside the checkout transaction, re-checked against `stockLimit` right before the
+increment — same pragmatic best-effort concurrency tradeoff as inventory reservation, not
+`SERIALIZABLE`); `GiftVoucher.balance` is the other one — decremented in the same transaction
+(re-validated against a last-instant race the same way), and refunded by `AdminOrdersService.
+updateStatus` if the order is later `CANCELLED`, mirroring how that same transition releases
+reserved inventory. Combo/BuyXGetY/FreeShipping have no persisted counter — they're pure price
+calculations, nothing to persist beyond the order's `discountTotal` (which folds *both* Coupon and
+automatic-promotion discounts into one number — there wasn't room to track them separately without
+a schema change; `giftVoucherAmount` gets its own column instead, since it's store credit, not a
+discount).
 
 **Media**: `R2Service` (`infra/r2/`) wraps Cloudflare R2 (S3-compatible, via
 `@aws-sdk/client-s3`) with a lazily-constructed client — the app boots fine with no R2
