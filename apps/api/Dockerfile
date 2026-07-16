@@ -17,6 +17,7 @@ COPY packages/config-ts packages/config-ts
 COPY packages/config-eslint packages/config-eslint
 COPY packages/contracts packages/contracts
 COPY apps/api apps/api
+RUN pnpm --filter @repo/contracts run build
 RUN cd apps/api && npx prisma generate
 RUN pnpm --filter api run build
 
