@@ -30,6 +30,8 @@ COPY --from=build /repo/apps/api/prisma ./prisma
 COPY --from=build /repo/apps/api/package.json ./package.json
 COPY --from=build /repo/node_modules /repo/node_modules
 COPY --from=build /repo/apps/api/node_modules ./node_modules
+COPY --from=build /repo/packages/contracts/dist /repo/packages/contracts/dist
+COPY --from=build /repo/packages/contracts/package.json /repo/packages/contracts/package.json
 
 EXPOSE 4000
 CMD ["node", "dist/main.js"]
