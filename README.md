@@ -67,16 +67,30 @@ pnpm docker:up
 pnpm --filter api prisma:generate
 pnpm db:migrate
 pnpm db:seed
+
+# build the shared workspace packages (required once before dev/build — see note below)
+pnpm turbo run build --filter=@repo/contracts --filter=@repo/ui
 ```
 
 Seeded data includes the four RBAC roles (`SUPER_ADMIN`, `ADMIN`, `STAFF`, `CUSTOMER`) with a
 starter permission set, an admin user (`admin@dautaytoystore.vn` / `Admin@123456` — **change
 this in any shared environment**), and a sample brand/category/product.
 
+> **Why the packages need a build step**: `@repo/contracts` and `@repo/ui` are plain TypeScript
+> source consumed by both apps. Next.js/webpack bundles that source directly, but NestJS's dev
+> runtime (`nest start`) and its production entrypoint (`node dist/main.js`) execute it via
+> Node's own module loader, which — for a multi-file package — requires real, already-compiled
+> `.js` files (Node's native TS support does not resolve extensionless relative imports across
+> package boundaries the way a bundler does). So these two packages compile to `dist/` via
+> `tsc` (see their `build` script) and `package.json#main`/`exports` point at `dist`, not `src`.
+> `pnpm turbo run build` (and `pnpm dev`, which now depends on it — see `turbo.json`) handles
+> this automatically; only run the command above manually if you invoke `nest start` or `next
+> dev` directly instead of through the root `pnpm dev`/`turbo` scripts.
+
 ## Running
 
 ```bash
-pnpm dev            # runs both apps via turbo (api: :4000, web: :3000)
+pnpm dev            # runs both apps via turbo (api: :4000, web: :3000); builds packages first
 pnpm --filter api dev
 pnpm --filter web dev
 ```

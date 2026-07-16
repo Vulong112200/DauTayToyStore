@@ -1,4 +1,64 @@
-# Architecture Decisions — Phase 1
+# Architecture Decisions
+
+## Phase 2 — Catalog + Cart core
+
+### Why `@repo/contracts`/`@repo/ui` compile to `dist/` (build step required)
+
+Discovered while first running `nest start` for real (Phase 1 had only ever run this package
+through `tsc --noEmit`, `ts-jest`, and Next.js/webpack — none of which exercise Node's own
+module loader the way `nest start`/`node dist/main.js` do). Both `@repo/contracts` and
+`@repo/ui` originally pointed `package.json#main` straight at `src/index.ts` with extensionless
+relative exports (`export * from './common/pagination'`). That works when the *consumer's own
+tool* transpiles/bundles the file (Next.js/webpack, ts-jest) — but NestJS's dev server and its
+compiled `node dist/main.js` entrypoint load cross-package files through Node's own resolver,
+and Node's native TypeScript support only follows the ESM resolution algorithm for `.ts` files,
+which requires explicit file extensions on relative specifiers. The fix: give both packages a
+real `build` script (`tsc -p tsconfig.build.json` → CommonJS `dist/*.js` + `.d.ts`, with the
+source's relative imports written as `./common/pagination.js` so the emitted JS's `require()`
+calls resolve to real sibling files), and point `package.json#main`/`exports` at `dist`. Root
+`turbo.json`'s `dev` task now `dependsOn: ["^build"]` so `pnpm dev` always builds these first;
+direct `nest start`/`next dev` invocations need `pnpm turbo run build --filter=@repo/contracts
+--filter=@repo/ui` run once beforehand (see README).
+
+### Cart identity: guest session header vs JWT, no forced login
+
+Carts must work for anonymous shoppers (typical for a toy-store storefront) as well as logged-in
+users. `CartIdentityGuard` (`apps/api/src/modules/cart/guards/cart-identity.guard.ts`) tries to
+verify a `Bearer` access token first; if that's absent/invalid it falls back to requiring an
+`x-cart-session` header — a random UUID the frontend generates once and persists in
+`localStorage` (`apps/web/lib/cart-session.ts`). `Cart.userId`/`Cart.sessionId` are both
+`@unique`, so `CartService` resolves the cart via `prisma.cart.upsert` on whichever identity is
+present. Known gap (not built yet): merging a guest cart into a user's cart on login.
+
+### Pipe-per-parameter, not per-method, when a handler mixes `@Body()` with other params
+
+Real bug caught while manually exercising the cart endpoints end-to-end (not caught by unit
+tests, since those call `CartService` directly, bypassing Nest's pipe pipeline — this is why the
+verification step included live `curl` smoke tests, not just `jest`): `@UsePipes(pipe)` at the
+**method** level applies that pipe to *every* parameter of the handler, not just the one
+decorated with `@Body()`. `CartController.addItem(@CurrentCartIdentity() identity, @Body() body)`
+had `@UsePipes(new ZodValidationPipe(addCartItemSchema))` at the method level, so the schema was
+also run against `identity` (`{ sessionId: '...' }`), which has no `productId` — failing with
+`"productId: Required"` before `body` was ever validated. `@Req()`/`@Res()`/`@Next()` are
+exempted from method-level pipes by Nest internally (which is why `AuthController`'s
+`(@Body() body, @Req() req)` handlers never hit this), but a custom decorator like
+`@CurrentCartIdentity()` is not. Fix: bind the pipe directly to the `@Body()` parameter —
+`@Body(new ZodValidationPipe(schema)) body: X` — instead of `@UsePipes()` on the method, whenever
+a handler has more than one param and only one of them needs validation.
+
+### Product listing/detail are Server Components with ISR, not client-fetched
+
+`/categories`, `/categories/[slug]`, `/products`, `/products/[slug]` fetch directly in the page
+(async Server Component) rather than through TanStack Query, using `revalidateSeconds` (mapped
+to Next's `fetch(..., { next: { revalidate } })`) instead of the `cache: 'no-store'` the auth
+API client uses. This gets real SSR/ISR HTML for SEO (a stated requirement) for free — verified
+during Phase 2 by confirming the built `/categories` page's static HTML already contains the
+Supabase-seeded category name. Cart and auth stay client-side (TanStack Query + Zustand) since
+they're inherently per-visitor, mutable, and not something search engines need to see.
+
+---
+
+# Phase 1
 
 ## Why a monorepo (Turborepo + pnpm)
 

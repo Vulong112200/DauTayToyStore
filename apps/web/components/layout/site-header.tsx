@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { Heart, Menu, Search, ShoppingCart, User, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ThemeToggle } from '@/components/theme-toggle';
+import { useCart } from '@/hooks/use-cart';
 import { cn } from '@/lib/utils';
 
 const NAV_LINKS = [
@@ -19,6 +20,8 @@ const NAV_LINKS = [
 
 export function SiteHeader() {
   const [mobileOpen, setMobileOpen] = React.useState(false);
+  const { data: cart } = useCart();
+  const itemCount = cart?.itemCount ?? 0;
 
   return (
     <header className="sticky top-0 z-50 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80">
@@ -56,9 +59,14 @@ export function SiteHeader() {
               <Heart className="h-5 w-5" />
             </Link>
           </Button>
-          <Button variant="ghost" size="icon" asChild aria-label="Giỏ hàng">
+          <Button variant="ghost" size="icon" asChild aria-label={`Giỏ hàng, ${itemCount} sản phẩm`} className="relative">
             <Link href="/cart">
               <ShoppingCart className="h-5 w-5" />
+              {itemCount > 0 && (
+                <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-semibold text-primary-foreground">
+                  {itemCount > 99 ? '99+' : itemCount}
+                </span>
+              )}
             </Link>
           </Button>
           <Button variant="ghost" size="icon" asChild aria-label="Tài khoản" className="hidden sm:inline-flex">

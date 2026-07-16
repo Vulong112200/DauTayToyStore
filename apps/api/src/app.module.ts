@@ -12,6 +12,8 @@ import { PrismaModule } from './infra/prisma/prisma.module';
 import { RedisModule } from './infra/redis/redis.module';
 import { AuditLogModule } from './modules/audit-log/audit-log.module';
 import { AuthModule } from './modules/auth/auth.module';
+import { CartModule } from './modules/cart/cart.module';
+import { CatalogModule } from './modules/catalog/catalog.module';
 import { HealthModule } from './modules/health/health.module';
 
 @Module({
@@ -34,6 +36,8 @@ import { HealthModule } from './modules/health/health.module';
     RedisModule,
     AuditLogModule,
     AuthModule,
+    CartModule,
+    CatalogModule,
     HealthModule,
   ],
   providers: [

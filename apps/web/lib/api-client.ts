@@ -11,9 +11,11 @@ export class ApiError extends Error {
   }
 }
 
-interface RequestOptions extends Omit<RequestInit, 'body'> {
+interface RequestOptions extends Omit<RequestInit, 'body' | 'cache'> {
   body?: unknown;
   auth?: boolean;
+  /** Seconds to cache the response for (Next.js ISR-style revalidation). Omit for no caching. */
+  revalidateSeconds?: number;
 }
 
 function extractMessage(payload: unknown): string {
@@ -27,7 +29,7 @@ function extractMessage(payload: unknown): string {
 
 export async function apiFetch<TResponse>(
   path: string,
-  { body, auth = false, headers, ...init }: RequestOptions = {},
+  { body, auth = false, headers, revalidateSeconds, ...init }: RequestOptions = {},
 ): Promise<TResponse> {
   const accessToken = auth ? useAuthStore.getState().tokens?.accessToken : undefined;
 
@@ -40,7 +42,9 @@ export async function apiFetch<TResponse>(
       ...headers,
     },
     body: body !== undefined ? JSON.stringify(body) : undefined,
-    cache: 'no-store',
+    ...(revalidateSeconds !== undefined
+      ? { next: { revalidate: revalidateSeconds } }
+      : { cache: 'no-store' as const }),
   });
 
   const contentType = response.headers.get('content-type') ?? '';
