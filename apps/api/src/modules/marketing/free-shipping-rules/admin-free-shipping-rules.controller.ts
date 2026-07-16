@@ -16,6 +16,7 @@ import { AdminFreeShippingRulesService } from './admin-free-shipping-rules.servi
 @ApiBearerAuth()
 @Controller('admin/free-shipping-rules')
 @Roles(RoleName.ADMIN, RoleName.SUPER_ADMIN, RoleName.STAFF)
+@RequirePermissions('marketing:read')
 @AuditLog('FreeShippingRule')
 export class AdminFreeShippingRulesController {
   constructor(private readonly adminFreeShippingRulesService: AdminFreeShippingRulesService) {}

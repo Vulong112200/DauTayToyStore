@@ -17,6 +17,7 @@ import { AdminComboDealsService } from './admin-combo-deals.service';
 @ApiBearerAuth()
 @Controller('admin/combo-deals')
 @Roles(RoleName.ADMIN, RoleName.SUPER_ADMIN, RoleName.STAFF)
+@RequirePermissions('marketing:read')
 @AuditLog('ComboDeal')
 export class AdminComboDealsController {
   constructor(private readonly adminComboDealsService: AdminComboDealsService) {}

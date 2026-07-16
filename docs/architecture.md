@@ -42,34 +42,32 @@ into an explicitly-checked one:
   override identical to `ADMIN`+`SUPER_ADMIN` — matches the seed (`STAFF` has no marketing
   permission at all).
 
-### Two spots deliberately left unenforced — seed data disagrees with current `@Roles()`, flagged for a decision rather than resolved unilaterally
+### Two spots left unenforced pending a decision — now resolved additively, current access preserved
 
-Two real discrepancies surfaced while doing the comparison above. Both are cases where enforcing
-the seeded permission would have *changed* real access for real roles, which is a product/security
-policy call, not a refactor — so neither was wired in, and both are recorded here instead:
+Two real discrepancies surfaced while doing the comparison above, both cases where enforcing the
+seeded permission as-is would have *changed* real access for real roles — a product/security
+policy call. The decision (see the two options previously recorded here): keep today's access as
+the source of truth and bring the seed up to match it, rather than tightening `@Roles()` to the
+seed's stricter original intent. Both are now enforced:
 
-1. **`AdminSettingsController`**: `PATCH /admin/settings` currently allows `ADMIN`+`SUPER_ADMIN`
-   (`@Roles(RoleName.ADMIN, RoleName.SUPER_ADMIN)`), but the seed deliberately excludes `ADMIN`
-   from `settings:manage` (`ROLE_PERMISSIONS.ADMIN` filters it out — the *only* permission key
-   `ADMIN` doesn't hold). Enforcing `settings:manage` here would newly block `ADMIN` from changing
-   site settings. `GET /admin/settings` has the same problem in reverse: it currently allows
-   `STAFF` to read settings via the class-level `@Roles()`, but there's no `settings:read` key in
-   the seed at all (only the SUPER_ADMIN-only `settings:manage`), so enforcing anything on the
-   `GET` would block `STAFF`'s current read access.
-2. **Marketing read endpoints** (the `GET`s on all six marketing controllers): currently allowed
-   for `STAFF` via the class-level `@Roles()`, but the seed's only marketing key is
-   `marketing:manage`, which `STAFF` doesn't hold — there's no `marketing:read` key. Enforcing
-   `marketing:manage` on these `GET`s (the same permission already correctly applied to the write
-   endpoints) would newly block `STAFF` from viewing coupons/flash sales/etc., which they can do
-   today.
+1. **`AdminSettingsController`**: `ROLE_PERMISSIONS.ADMIN` no longer filters out `settings:manage`
+   — `ADMIN` now holds every permission key (same as `SUPER_ADMIN`), matching its existing
+   `@Roles(RoleName.ADMIN, RoleName.SUPER_ADMIN)` on `PATCH /admin/settings`, which now also
+   carries `@RequirePermissions('settings:manage')`. A new `settings:read` key was added and
+   granted to `STAFF`/`ADMIN`/`SUPER_ADMIN`, and the controller's class-level
+   `@RequirePermissions('settings:read')` enforces it on `GET /admin/settings` (the `PATCH`'s
+   method-level `settings:manage` overrides the class-level key via `getAllAndOverride`, per the
+   `PermissionsGuard` semantics described above).
+2. **Marketing read endpoints**: a new `marketing:read` key was added and granted to
+   `STAFF`/`ADMIN`/`SUPER_ADMIN`. Each of the six marketing controllers now carries a class-level
+   `@RequirePermissions('marketing:read')`, enforced on their `GET`s; the existing method-level
+   `@RequirePermissions('marketing:manage')` on each `POST`/`PATCH`/`DELETE` is unaffected (method-
+   level overrides class-level).
 
-Both are left on role-only gating (unchanged behavior) until it's decided whether: (a) `ADMIN`
-should keep settings access and `STAFF` should keep settings/marketing read access — in which case
-the fix is additive seed changes (new `settings:read`/`marketing:read` keys granted to the
-relevant roles, and/or adding `settings:manage` back to `ADMIN`'s list), or (b) the seed's stricter
-intent is actually correct and today's `@Roles()` should be *tightened* to match it (a real access
-reduction for `ADMIN`/`STAFF` that would need sign-off first, since it changes what currently-
-deployed admin accounts can do).
+Net effect: no real user's access changed — `STAFF` keeps reading settings/marketing, `ADMIN` keeps
+writing settings — but every admin route now has an explicit, seed-backed permission check instead
+of relying on `@Roles()` alone. Re-run `pnpm db:seed` (idempotent, `skipDuplicates: true`) against
+any environment seeded before this change to pick up the two new permission keys.
 
 ### A `curl`/bash encoding bug corrupted a live product's Vietnamese text during verification — caught and fixed, not a code bug
 

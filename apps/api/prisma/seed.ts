@@ -13,13 +13,23 @@ const PERMISSIONS: Array<{ key: string; description: string }> = [
   { key: 'user:read', description: 'Xem người dùng' },
   { key: 'user:manage', description: 'Quản lý người dùng và phân quyền' },
   { key: 'marketing:manage', description: 'Quản lý khuyến mãi/voucher' },
+  { key: 'marketing:read', description: 'Xem khuyến mãi/voucher' },
   { key: 'settings:manage', description: 'Quản lý cấu hình hệ thống' },
+  { key: 'settings:read', description: 'Xem cấu hình hệ thống' },
 ];
 
 const ROLE_PERMISSIONS: Record<RoleName, string[]> = {
   SUPER_ADMIN: PERMISSIONS.map((p) => p.key),
-  ADMIN: PERMISSIONS.map((p) => p.key).filter((k) => k !== 'settings:manage'),
-  STAFF: ['product:read', 'product:update', 'order:read', 'order:update', 'user:read'],
+  ADMIN: PERMISSIONS.map((p) => p.key),
+  STAFF: [
+    'product:read',
+    'product:update',
+    'order:read',
+    'order:update',
+    'user:read',
+    'marketing:read',
+    'settings:read',
+  ],
   CUSTOMER: [],
 };
 

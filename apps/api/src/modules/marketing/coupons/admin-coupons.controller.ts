@@ -19,6 +19,7 @@ import { AdminCouponsService } from './admin-coupons.service';
 @ApiBearerAuth()
 @Controller('admin/coupons')
 @Roles(RoleName.ADMIN, RoleName.SUPER_ADMIN, RoleName.STAFF)
+@RequirePermissions('marketing:read')
 @AuditLog('Coupon')
 export class AdminCouponsController {
   constructor(private readonly adminCouponsService: AdminCouponsService) {}

@@ -16,6 +16,7 @@ import { AdminBuyXGetYRulesService } from './admin-buy-x-get-y-rules.service';
 @ApiBearerAuth()
 @Controller('admin/buy-x-get-y-rules')
 @Roles(RoleName.ADMIN, RoleName.SUPER_ADMIN, RoleName.STAFF)
+@RequirePermissions('marketing:read')
 @AuditLog('BuyXGetYRule')
 export class AdminBuyXGetYRulesController {
   constructor(private readonly adminBuyXGetYRulesService: AdminBuyXGetYRulesService) {}

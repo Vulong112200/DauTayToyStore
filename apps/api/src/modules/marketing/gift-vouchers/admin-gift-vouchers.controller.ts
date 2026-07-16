@@ -21,6 +21,7 @@ import { AdminGiftVouchersService } from './admin-gift-vouchers.service';
 @ApiBearerAuth()
 @Controller('admin/gift-vouchers')
 @Roles(RoleName.ADMIN, RoleName.SUPER_ADMIN, RoleName.STAFF)
+@RequirePermissions('marketing:read')
 @AuditLog('GiftVoucher')
 export class AdminGiftVouchersController {
   constructor(private readonly adminGiftVouchersService: AdminGiftVouchersService) {}

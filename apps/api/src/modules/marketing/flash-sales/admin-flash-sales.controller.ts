@@ -17,6 +17,7 @@ import { AdminFlashSalesService } from './admin-flash-sales.service';
 @ApiBearerAuth()
 @Controller('admin/flash-sales')
 @Roles(RoleName.ADMIN, RoleName.SUPER_ADMIN, RoleName.STAFF)
+@RequirePermissions('marketing:read')
 @AuditLog('FlashSale')
 export class AdminFlashSalesController {
   constructor(private readonly adminFlashSalesService: AdminFlashSalesService) {}
