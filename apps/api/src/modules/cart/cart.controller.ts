@@ -7,12 +7,12 @@ import {
   addCartItemSchema,
   updateCartItemSchema,
 } from '@repo/contracts';
+import { CartIdentity } from '../../common/cart-identity/cart-identity';
+import { CurrentCartIdentity } from '../../common/cart-identity/cart-identity.decorator';
+import { CartIdentityGuard } from '../../common/cart-identity/cart-identity.guard';
 import { Public } from '../../common/decorators/public.decorator';
 import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe';
-import { CartIdentity } from './cart-identity';
 import { CartService } from './cart.service';
-import { CurrentCartIdentity } from './decorators/cart-identity.decorator';
-import { CartIdentityGuard } from './guards/cart-identity.guard';
 
 @ApiTags('cart')
 @Controller('cart')

@@ -1,8 +1,9 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import type { AddCartItemInput, CartItemView, CartView } from '@repo/contracts';
+import { CartIdentity } from '../../common/cart-identity/cart-identity';
+import { resolveAvailableStock } from '../../common/utils/inventory.util';
 import { PrismaService } from '../../infra/prisma/prisma.service';
-import { CartIdentity } from './cart-identity';
 
 const ITEM_INCLUDE = {
   product: {
@@ -25,13 +26,6 @@ const ITEM_INCLUDE = {
 } satisfies Prisma.CartItemInclude;
 
 type CartItemRow = Prisma.CartItemGetPayload<{ include: typeof ITEM_INCLUDE }>;
-
-function resolveAvailableStock(
-  inventory: { quantityOnHand: number; quantityReserved: number } | null | undefined,
-): number {
-  if (!inventory) return Number.MAX_SAFE_INTEGER;
-  return Math.max(0, inventory.quantityOnHand - inventory.quantityReserved);
-}
 
 function toItemView(item: CartItemRow): CartItemView {
   const unitPrice = item.variant?.priceOverride ?? item.product.price;

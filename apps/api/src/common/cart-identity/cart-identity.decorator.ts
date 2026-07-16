@@ -1,6 +1,6 @@
 import { ExecutionContext, createParamDecorator } from '@nestjs/common';
 import { Request } from 'express';
-import { CartIdentity } from '../cart-identity';
+import { CartIdentity } from './cart-identity';
 
 export const CurrentCartIdentity = createParamDecorator(
   (_data: unknown, ctx: ExecutionContext): CartIdentity => {

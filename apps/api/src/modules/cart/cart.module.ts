@@ -1,13 +1,12 @@
 import { Module } from '@nestjs/common';
-import { JwtModule } from '@nestjs/jwt';
+import { CartIdentityModule } from '../../common/cart-identity/cart-identity.module';
 import { CartController } from './cart.controller';
 import { CartService } from './cart.service';
-import { CartIdentityGuard } from './guards/cart-identity.guard';
 
 @Module({
-  imports: [JwtModule.register({})],
+  imports: [CartIdentityModule],
   controllers: [CartController],
-  providers: [CartService, CartIdentityGuard],
+  providers: [CartService],
   exports: [CartService],
 })
 export class CartModule {}

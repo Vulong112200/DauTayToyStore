@@ -1,5 +1,62 @@
 # Architecture Decisions
 
+## Phase 2 — Checkout + Order
+
+### Shipping address is snapshotted onto `Order`, not just referenced via `Address`
+
+`Address.userId` is required (a registered user's saved address book), but checkout must work
+for guests too. Rather than making `Address` nullable-owner or building a parallel guest-address
+concept, `Order` got its own `shippingLine1/2/ward/district/province/postalCode` columns,
+populated directly from the checkout form regardless of whether the buyer is logged in.
+`addressId` stays as an optional reference for the (not yet built) "checkout from a saved
+address" convenience feature — but the snapshot fields are the source of truth for what was
+actually shipped, which is also just correct order-history semantics (an order shouldn't change
+retroactively if the customer later edits their saved address).
+
+### `CartIdentityGuard` had to move out of `CartModule` into `common/`
+
+Wiring `OrdersController`'s checkout endpoint to reuse `CartModule`'s existing
+`CartIdentityGuard` (`@UseGuards(CartIdentityGuard)`, with `OrdersModule` importing
+`CartModule`) crashed both modules at boot with `Nest can't resolve dependencies of the
+CartIdentityGuard (?, ConfigService)`. Root cause, confirmed by reproducing it two different
+ways: Nest resolves a guard passed by class reference to `@UseGuards()` by constructing a fresh
+instance scoped to the **consuming controller's own module**, not by reusing whatever instance
+already exists in a module that merely exports the guard's *class*. That means every one of the
+guard's constructor dependencies must be independently resolvable in the consuming module's own
+import graph — exporting the guard class alone isn't enough if its dependencies (here,
+`JwtService`) aren't *also* visible through that chain. Two changes were needed together: (1)
+move `CartIdentityGuard`/`CartIdentity`/`CurrentCartIdentity` out of the `cart` feature module
+into `common/cart-identity/` as a proper cross-cutting concern (it's shared by Cart and Orders,
+arguably more), with its own `CartIdentityModule`, and (2) have `CartIdentityModule` re-export
+`JwtModule` itself, not just the guard — so any module importing `CartIdentityModule` gets
+`JwtService` visible too, satisfying the guard's constructor wherever it's used. Lesson for any
+future guard/pipe/interceptor shared across feature modules: **export the module that provides
+its dependencies, not just the enhancer class.**
+
+### Inventory reservation happens at checkout, not at payment confirmation
+
+Since Phase 2 only supports COD (no real payment gateway yet), "payment confirmed" isn't a
+meaningful event to gate stock reservation on. `OrdersService.checkout` increments
+`Inventory.quantityReserved` for every line item inside the same transaction that creates the
+order and clears the cart — so a placed order immediately reduces what `resolveAvailableStock`
+reports elsewhere (cart, product listing) even before anyone confirms/ships it. Known gap: there
+is no cancel/expire flow yet to release that reservation, so a cancelled order currently leaves
+stock reserved. That's an explicit call to make in Phase 3 (admin order management) alongside
+building the status-transition endpoints.
+
+### Order confirmation avoids both a refetch and leaking email via URL
+
+After a successful checkout, the frontend doesn't re-fetch the order — the API's create response
+already **is** the full `OrderView`, so it's stashed in `sessionStorage` and the browser is routed
+to `/order-confirmation/[orderNumber]`, which reads it back on mount. This sidesteps two less
+appealing alternatives: refetching via the same guest-tracking endpoint (`GET /orders/track`)
+would require passing the customer's email through the URL (`?email=...`), which is unnecessary
+exposure for a same-session confirmation; and there's no session/cookie concept on this stateless
+JWT API to authorize a plain `GET /orders/:orderNumber` for a guest. If the confirmation page is
+reloaded or opened fresh (`sessionStorage` empty/mismatched), it degrades gracefully to a prompt
+pointing at `/order-tracking` — which *does* require the email, appropriately, since that's an
+intentional cross-session lookup.
+
 ## Phase 2 — Catalog + Cart core
 
 ### Why `@repo/contracts`/`@repo/ui` compile to `dist/` (build step required)

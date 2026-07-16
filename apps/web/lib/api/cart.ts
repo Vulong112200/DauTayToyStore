@@ -1,27 +1,23 @@
 import type { AddCartItemInput, CartView, UpdateCartItemInput } from '@repo/contracts';
-import { useAuthStore } from '@/store/auth-store';
 import { apiFetch } from '../api-client';
-import { getOrCreateCartSessionId } from '../cart-session';
-
-function cartHeaders(): Record<string, string> {
-  const accessToken = useAuthStore.getState().tokens?.accessToken;
-  if (accessToken) return { Authorization: `Bearer ${accessToken}` };
-  return { 'x-cart-session': getOrCreateCartSessionId() };
-}
+import { cartIdentityHeaders } from '../cart-headers';
 
 export const cartApi = {
-  get: () => apiFetch<CartView>('/cart', { headers: cartHeaders() }),
+  get: () => apiFetch<CartView>('/cart', { headers: cartIdentityHeaders() }),
 
   addItem: (input: AddCartItemInput) =>
-    apiFetch<CartView>('/cart/items', { body: input, headers: cartHeaders() }),
+    apiFetch<CartView>('/cart/items', { body: input, headers: cartIdentityHeaders() }),
 
   updateItem: (itemId: string, input: UpdateCartItemInput) =>
     apiFetch<CartView>(`/cart/items/${itemId}`, {
       method: 'PATCH',
       body: input,
-      headers: cartHeaders(),
+      headers: cartIdentityHeaders(),
     }),
 
   removeItem: (itemId: string) =>
-    apiFetch<CartView>(`/cart/items/${itemId}`, { method: 'DELETE', headers: cartHeaders() }),
+    apiFetch<CartView>(`/cart/items/${itemId}`, {
+      method: 'DELETE',
+      headers: cartIdentityHeaders(),
+    }),
 };

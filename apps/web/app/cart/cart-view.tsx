@@ -121,8 +121,8 @@ export function CartView() {
             <span>Tổng cộng</span>
             <span className="text-primary">{formatVnd(cart.subtotal)}</span>
           </div>
-          <Button size="lg" className="mt-4 w-full" disabled>
-            Tiến hành thanh toán (sắp ra mắt)
+          <Button size="lg" className="mt-4 w-full" asChild>
+            <Link href="/checkout">Tiến hành thanh toán</Link>
           </Button>
         </div>
       </div>

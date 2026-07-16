@@ -2,11 +2,17 @@ import { BadRequestException, CanActivate, ExecutionContext, Injectable } from '
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { Request } from 'express';
-import { AppConfiguration } from '../../../config/configuration';
-import { CartIdentity } from '../cart-identity';
+import { AppConfiguration } from '../../config/configuration';
+import { CartIdentity } from './cart-identity';
 
 export const CART_SESSION_HEADER = 'x-cart-session';
 
+/**
+ * Resolves the caller's cart identity — either the authenticated user (Bearer
+ * token) or a guest session id header. Shared by any feature that needs to
+ * find "the current cart" (Cart, Orders/checkout), so it lives under
+ * common/ rather than inside a single feature module.
+ */
 @Injectable()
 export class CartIdentityGuard implements CanActivate {
   constructor(

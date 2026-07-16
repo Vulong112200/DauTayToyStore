@@ -15,6 +15,7 @@ import { AuthModule } from './modules/auth/auth.module';
 import { CartModule } from './modules/cart/cart.module';
 import { CatalogModule } from './modules/catalog/catalog.module';
 import { HealthModule } from './modules/health/health.module';
+import { OrdersModule } from './modules/orders/orders.module';
 
 @Module({
   imports: [
@@ -39,6 +40,7 @@ import { HealthModule } from './modules/health/health.module';
     CartModule,
     CatalogModule,
     HealthModule,
+    OrdersModule,
   ],
   providers: [
     { provide: APP_FILTER, useClass: HttpExceptionFilter },
