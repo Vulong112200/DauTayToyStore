@@ -3,12 +3,13 @@
 import * as React from 'react';
 import { useRouter } from 'next/navigation';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useForm } from 'react-hook-form';
+import { Controller, useForm } from 'react-hook-form';
 import {
   type AdminBlogPostDetail,
   type BlogPostInput,
   blogPostInputSchema,
 } from '@repo/contracts';
+import { MediaPicker } from '@/components/admin/media/media-picker';
 import { FormError } from '@/components/auth/form-error';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -45,6 +46,7 @@ export function BlogPostForm({ post }: { post?: AdminBlogPostDetail }) {
 
   const {
     register,
+    control,
     handleSubmit,
     formState: { errors },
   } = useForm<BlogPostInput>({
@@ -112,7 +114,13 @@ export function BlogPostForm({ post }: { post?: AdminBlogPostDetail }) {
         </div>
         <div className="space-y-1.5 sm:col-span-2">
           <Label htmlFor="coverImageUrl">URL ảnh bìa (tuỳ chọn)</Label>
-          <Input id="coverImageUrl" {...register('coverImageUrl')} />
+          <Controller
+            control={control}
+            name="coverImageUrl"
+            render={({ field }) => (
+              <MediaPicker value={field.value} onChange={field.onChange} />
+            )}
+          />
           {errors.coverImageUrl && (
             <p className="text-xs text-destructive">{errors.coverImageUrl.message}</p>
           )}

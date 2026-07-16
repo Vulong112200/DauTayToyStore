@@ -128,8 +128,14 @@ pnpm docker:up      # postgres + redis for local dev
 pnpm docker:down
 ```
 
-`apps/api/Dockerfile` and `apps/web/Dockerfile` build production images for deployment
-(API → Render, Web → Vercel, per the target deployment model).
+`apps/api/Dockerfile` builds the production image Render deploys directly. `apps/web/Dockerfile`
+is for self-hosting the web app via Docker elsewhere — **Vercel does not use it**; Vercel builds
+Next.js with its own buildpack instead.
+
+## Deploy
+
+Full step-by-step guide (Render for the API, Vercel for the web app, connecting the two,
+post-deploy checklist): see [`docs/deployment.md`](./docs/deployment.md).
 
 ## Roadmap
 
@@ -141,8 +147,9 @@ pnpm docker:down
   voucher is admin CRUD only, redemption needs a schema migration), audit logs, reports, media
   library (Cloudflare R2, verified live), site settings
 - **Phase 4** — ✅ promotion engine (flash sale/combo/buy-X-get-Y/free-shipping all wired into
-  checkout pricing) and ✅ guest→user cart merge on login are done; still open: gift voucher
-  redemption at checkout (needs a `Cart`/`Order` → `GiftVoucher` migration); a real payment
-  gateway (COD only today); a media-picker UI wired into the existing raw-URL image fields
-  (product/blog/banner/brand)
+  checkout pricing), ✅ guest→user cart merge on login, and ✅ a media-picker UI wired into every
+  raw-URL image field (product/category/blog/banner/brand — see `docs/architecture.md`; UI
+  interaction not verified in a real browser in this environment, only build/lint/typecheck)
+  are done; still open: gift voucher redemption at checkout (needs a `Cart`/`Order` →
+  `GiftVoucher` migration); a real payment gateway (COD only today)
 - **Phase 5** — AI modules (description/SEO/FAQ generation, chat assistant, recommendations, image tooling)

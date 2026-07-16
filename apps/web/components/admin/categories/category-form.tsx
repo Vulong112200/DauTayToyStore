@@ -1,8 +1,9 @@
 'use client';
 
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useForm } from 'react-hook-form';
+import { Controller, useForm } from 'react-hook-form';
 import { type AdminCategory, type CategoryInput, categoryInputSchema } from '@repo/contracts';
+import { MediaPicker } from '@/components/admin/media/media-picker';
 import { FormError } from '@/components/auth/form-error';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -25,6 +26,7 @@ export function CategoryForm({
 }) {
   const {
     register,
+    control,
     handleSubmit,
     formState: { errors },
   } = useForm<CategoryInput>({
@@ -83,6 +85,14 @@ export function CategoryForm({
       <div className="space-y-1.5">
         <Label htmlFor="description">Mô tả (tuỳ chọn)</Label>
         <Input id="description" {...register('description')} />
+      </div>
+      <div className="space-y-1.5">
+        <Label htmlFor="imageUrl">Ảnh danh mục (tuỳ chọn)</Label>
+        <Controller
+          control={control}
+          name="imageUrl"
+          render={({ field }) => <MediaPicker value={field.value} onChange={field.onChange} />}
+        />
       </div>
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="space-y-1.5">

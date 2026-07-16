@@ -1,5 +1,58 @@
 # Architecture Decisions
 
+## Phase 4 — Media picker wired into every raw-URL image field
+
+### Additive, not a replacement — the text input stays
+
+`MediaPicker` (`components/admin/media/media-picker.tsx`) renders the existing text `Input`
+*plus* a button that opens a modal over the same data `/admin/media` already lists (via the
+existing `useAdminMedia`/`useUploadMedia` hooks — no new hooks or API routes needed). Every image
+field it's wired into (`product-form.tsx`'s `images[].url`, `category-form.tsx`'s `imageUrl`,
+`brand-form.tsx`'s `logoUrl`, `blog-post-form.tsx`'s `coverImageUrl`, `banner-form.tsx`'s
+`imageUrl`) is still a plain `z.string().url()` in the contract — picking from the library just
+fills the same text field a pasted external URL would. This was a deliberate choice over adding a
+separate "asset id" field: no schema/contract change, and pasting a third-party image URL (e.g.
+while content is still being migrated into the library) keeps working exactly as before.
+
+### `category-form.tsx` had `imageUrl` in `defaultValues` but no field in the JSX at all
+
+Investigated before writing any code and confirmed: the category form already threaded
+`imageUrl` through `defaultValues` (so editing a category with an image wouldn't blow it away on
+save) but never rendered an input for it — a pre-existing gap, not something this slice
+introduced. Added the field for the first time here, using `MediaPicker` from day one rather than
+shipping a plain text input just to replace it again later.
+
+### Every field switched from `register` to `Controller` — `MediaPicker` is a controlled component
+
+All five forms previously used bare `register('fieldName')` for their image fields (uncontrolled
+inputs — react-hook-form reads the DOM node's value on submit). `MediaPicker` needs to be told
+its value from outside (when a library asset is picked, the state update happens external to any
+`<input onChange>`), so every wiring uses `<Controller name="..." render={({ field }) => <MediaPicker value={field.value} onChange={field.onChange} />} />` instead. `product-form.tsx` already
+had `control` (for its `useFieldArray` calls); the other four forms didn't destructure `control`
+from `useForm()` before this and needed it added.
+
+### The library grid can safely use `next/image`; the picker's own preview thumbnail can't
+
+`/admin/media`'s asset grid always shows R2-hosted URLs (the API only ever returns what it just
+uploaded there), which match `next.config`'s `remotePatterns` (`**.r2.dev` /
+`**.dautaytoystore.vn`) — safe for `next/image`. But `MediaPicker`'s small preview thumbnail next
+to the text input reflects whatever URL is *currently in the form field*, which can be a
+third-party URL an admin pasted by hand (still fully supported, per above) and might not be on
+that whitelist — `next/image` throws a hard runtime error for an unconfigured hostname. That
+preview uses a plain `<img>` instead, specifically because its input isn't constrained to a known
+set of domains the way the library grid's is.
+
+### UI verification was blocked by curl vs. real-browser hydration, not by anything this change broke
+
+`pnpm build`/`lint`/`typecheck`/`test` all pass, and `next build` succeeds. Attempting to verify
+the actual dialog interaction by starting the dev server and `curl`-ing admin pages hit a 500 —
+but the same 500 reproduces on `/admin/orders` and `/admin/inventory`, pages untouched by this
+slice, confirming it's the pre-existing `AdminGuard`/`useAuthHydrated` behavior (a client
+component reading browser-only Zustand persist APIs) triggering on curl's server-render pass, not
+a regression. This slice's actual click-through (opening the picker, selecting an asset,
+confirming the URL lands in the field) could not be verified in a real browser in this
+environment — flagged explicitly rather than claimed as tested.
+
 ## Phase 4 — Guest→user cart merge on login
 
 ### The merge point is the auth flow, not the cart flow — auth controllers read the guest header directly, no guard involved

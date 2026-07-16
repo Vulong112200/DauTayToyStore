@@ -141,9 +141,16 @@ service code — left for later.
 **Media**: `R2Service` (`infra/r2/`) wraps Cloudflare R2 (S3-compatible, via
 `@aws-sdk/client-s3`) with a lazily-constructed client — the app boots fine with no R2
 credentials configured; only an actual upload/delete call fails, with a clear error naming the
-missing env var. No existing image field (product images, blog cover image, banner image, brand
-logo) is wired to a "pick from library" UI yet — admins upload via `/admin/media` and manually
-paste the returned URL into those still-plain `z.string().url()` text inputs.
+missing env var. Every image field across the admin (product images, category/blog/banner image,
+brand logo) is still a plain `z.string().url()` in the contracts, but each now uses
+`MediaPicker` (`components/admin/media/media-picker.tsx`) instead of a bare `Input` — it keeps
+the same text field (so pasting an external URL still works) and adds a button opening a modal
+over `/admin/media`'s existing library (pick an asset or upload a new one inline). Wired via
+react-hook-form's `Controller`, not `register`, since the value can change from outside a DOM
+`onChange` (picking a library asset). The picker's own preview thumbnail renders with a plain
+`<img>`, not `next/image` — its value can be any admin-pasted URL, not just R2 asset URLs, so it
+can't rely on `next.config`'s `remotePatterns` whitelist the way `/admin/media`'s own asset grid
+(always R2 URLs) safely can.
 
 **Frontend rendering split**: catalog pages (`/categories`, `/categories/[slug]`, `/products`,
 `/products/[slug]`) are Server Components fetching directly with ISR

@@ -1,8 +1,9 @@
 'use client';
 
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useForm } from 'react-hook-form';
+import { Controller, useForm } from 'react-hook-form';
 import { type AdminBanner, type BannerInput, bannerInputSchema } from '@repo/contracts';
+import { MediaPicker } from '@/components/admin/media/media-picker';
 import { FormError } from '@/components/auth/form-error';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -45,6 +46,7 @@ export function BannerForm({
 }) {
   const {
     register,
+    control,
     handleSubmit,
     formState: { errors },
   } = useForm<BannerInput>({
@@ -78,7 +80,13 @@ export function BannerForm({
         </div>
         <div className="space-y-1.5">
           <Label htmlFor="imageUrl">URL ảnh</Label>
-          <Input id="imageUrl" aria-invalid={!!errors.imageUrl} {...register('imageUrl')} />
+          <Controller
+            control={control}
+            name="imageUrl"
+            render={({ field }) => (
+              <MediaPicker value={field.value} onChange={field.onChange} />
+            )}
+          />
           {errors.imageUrl && (
             <p className="text-xs text-destructive">{errors.imageUrl.message}</p>
           )}

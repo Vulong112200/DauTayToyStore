@@ -1,8 +1,9 @@
 'use client';
 
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useForm } from 'react-hook-form';
+import { Controller, useForm } from 'react-hook-form';
 import { type AdminBrand, type BrandInput, brandInputSchema } from '@repo/contracts';
+import { MediaPicker } from '@/components/admin/media/media-picker';
 import { FormError } from '@/components/auth/form-error';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -23,6 +24,7 @@ export function BrandForm({
 }) {
   const {
     register,
+    control,
     handleSubmit,
     formState: { errors },
   } = useForm<BrandInput>({
@@ -61,7 +63,13 @@ export function BrandForm({
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="space-y-1.5">
           <Label htmlFor="logoUrl">URL logo (tuỳ chọn)</Label>
-          <Input id="logoUrl" {...register('logoUrl')} />
+          <Controller
+            control={control}
+            name="logoUrl"
+            render={({ field }) => (
+              <MediaPicker value={field.value} onChange={field.onChange} />
+            )}
+          />
         </div>
         <div className="space-y-1.5">
           <Label htmlFor="originCountry">Xuất xứ (tuỳ chọn)</Label>

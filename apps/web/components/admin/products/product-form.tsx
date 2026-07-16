@@ -3,9 +3,10 @@
 import * as React from 'react';
 import { useRouter } from 'next/navigation';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useFieldArray, useForm } from 'react-hook-form';
+import { Controller, useFieldArray, useForm } from 'react-hook-form';
 import { Plus, Trash2 } from 'lucide-react';
 import { type AdminProductDetail, type ProductInput, productInputSchema } from '@repo/contracts';
+import { MediaPicker } from '@/components/admin/media/media-picker';
 import { FormError } from '@/components/auth/form-error';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -267,7 +268,15 @@ export function ProductForm({ product }: { product?: AdminProductDetail }) {
         <div className="mt-4 space-y-3">
           {imagesArray.fields.map((field, index) => (
             <div key={field.id} className="flex items-center gap-3">
-              <Input placeholder="URL hình ảnh" {...register(`images.${index}.url` as const)} />
+              <div className="flex-1">
+                <Controller
+                  control={control}
+                  name={`images.${index}.url` as const}
+                  render={({ field: urlField }) => (
+                    <MediaPicker value={urlField.value} onChange={urlField.onChange} />
+                  )}
+                />
+              </div>
               <label className="flex shrink-0 items-center gap-1.5 text-xs text-muted-foreground">
                 <input type="checkbox" {...register(`images.${index}.isPrimary` as const)} /> Ảnh
                 chính
