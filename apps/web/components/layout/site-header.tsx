@@ -2,6 +2,7 @@
 
 import * as React from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { Heart, Menu, Search, ShoppingCart, User, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ThemeToggle } from '@/components/theme-toggle';
@@ -14,19 +15,27 @@ const NAV_LINKS = [
   { href: '/', label: 'Trang chủ' },
   { href: '/categories', label: 'Danh mục' },
   { href: '/products', label: 'Sản phẩm' },
-  { href: '/flash-sales', label: 'Flash Sale' },
   { href: '/blog', label: 'Blog' },
+  { href: '/faq', label: 'Hỏi đáp' },
   { href: '/about', label: 'Giới thiệu' },
   { href: '/contact', label: 'Liên hệ' },
 ];
 
 export function SiteHeader() {
+  const router = useRouter();
   const [mobileOpen, setMobileOpen] = React.useState(false);
+  const [searchTerm, setSearchTerm] = React.useState('');
   const user = useAuthStore((state) => state.user);
   const { data: cart } = useCart();
   const { data: wishlist } = useWishlist(!!user);
   const itemCount = cart?.itemCount ?? 0;
   const wishlistCount = wishlist?.items.length ?? 0;
+
+  function handleSearchSubmit(event: React.FormEvent) {
+    event.preventDefault();
+    const trimmed = searchTerm.trim();
+    router.push(trimmed ? `/products?q=${encodeURIComponent(trimmed)}` : '/products');
+  }
 
   return (
     <header className="sticky top-0 z-50 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80">
@@ -47,15 +56,20 @@ export function SiteHeader() {
           ))}
         </nav>
 
-        <div className="hidden flex-1 max-w-sm items-center rounded-xl border border-input bg-muted/50 px-3 py-2 md:flex">
+        <form
+          onSubmit={handleSearchSubmit}
+          className="hidden flex-1 max-w-sm items-center rounded-xl border border-input bg-muted/50 px-3 py-2 md:flex"
+        >
           <Search className="mr-2 h-4 w-4 text-muted-foreground" aria-hidden />
           <input
             type="search"
+            value={searchTerm}
+            onChange={(event) => setSearchTerm(event.target.value)}
             placeholder="Tìm đồ chơi cho bé..."
             aria-label="Tìm kiếm sản phẩm"
             className="w-full bg-transparent text-sm outline-none placeholder:text-muted-foreground"
           />
-        </div>
+        </form>
 
         <div className="flex items-center gap-1">
           <ThemeToggle />

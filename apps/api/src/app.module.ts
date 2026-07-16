@@ -15,6 +15,7 @@ import { AuditLogModule } from './modules/audit-log/audit-log.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { CartModule } from './modules/cart/cart.module';
 import { CatalogModule } from './modules/catalog/catalog.module';
+import { ContentModule } from './modules/content/content.module';
 import { HealthModule } from './modules/health/health.module';
 import { OrdersModule } from './modules/orders/orders.module';
 import { UsersModule } from './modules/users/users.module';
@@ -43,6 +44,7 @@ import { WishlistModule } from './modules/wishlist/wishlist.module';
     AuthModule,
     CartModule,
     CatalogModule,
+    ContentModule,
     HealthModule,
     OrdersModule,
     UsersModule,

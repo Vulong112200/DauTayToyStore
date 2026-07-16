@@ -14,7 +14,6 @@ const FOOTER_SECTIONS = [
     links: [
       { href: '/faq', label: 'Câu hỏi thường gặp' },
       { href: '/order-tracking', label: 'Tra cứu đơn hàng' },
-      { href: '/reviews', label: 'Đánh giá khách hàng' },
     ],
   },
   {

@@ -168,10 +168,90 @@ async function seedCatalog() {
   return { brand, category, product };
 }
 
+async function seedContent() {
+  const faqEntries: Array<{ question: string; answer: string; category: string; sortOrder: number }> = [
+    {
+      question: 'Thời gian giao hàng mất bao lâu?',
+      answer:
+        'Đơn hàng nội thành thường giao trong 1-2 ngày, các tỉnh thành khác từ 3-5 ngày làm việc.',
+      category: 'Vận chuyển',
+      sortOrder: 0,
+    },
+    {
+      question: 'DauTayToy Store có hỗ trợ đổi trả không?',
+      answer:
+        'Có, bạn có thể đổi trả sản phẩm trong vòng 7 ngày kể từ khi nhận hàng nếu sản phẩm còn nguyên tem mác.',
+      category: 'Đổi trả',
+      sortOrder: 1,
+    },
+    {
+      question: 'Sản phẩm có đảm bảo an toàn cho trẻ em không?',
+      answer:
+        'Tất cả sản phẩm tại DauTayToy Store đều có nguồn gốc rõ ràng và đạt các tiêu chuẩn an toàn như EN71, ASTM F963.',
+      category: 'Sản phẩm',
+      sortOrder: 2,
+    },
+    {
+      question: 'Tôi có thể thanh toán bằng hình thức nào?',
+      answer: 'Hiện tại cửa hàng hỗ trợ thanh toán khi nhận hàng (COD) trên toàn quốc.',
+      category: 'Thanh toán',
+      sortOrder: 3,
+    },
+  ];
+
+  await prisma.faqEntry.createMany({ data: faqEntries, skipDuplicates: true });
+
+  const blogCategory = await prisma.blogCategory.upsert({
+    where: { slug: 'meo-hay' },
+    update: {},
+    create: { name: 'Mẹo hay', slug: 'meo-hay' },
+  });
+
+  await prisma.blogPost.upsert({
+    where: { slug: 'cach-chon-do-choi-phu-hop-theo-do-tuoi' },
+    update: {},
+    create: {
+      categoryId: blogCategory.id,
+      title: 'Cách chọn đồ chơi phù hợp theo độ tuổi của bé',
+      slug: 'cach-chon-do-choi-phu-hop-theo-do-tuoi',
+      excerpt:
+        'Chọn đúng đồ chơi theo từng giai đoạn phát triển giúp bé học hỏi tốt hơn và đảm bảo an toàn.',
+      content:
+        '<p>Việc lựa chọn đồ chơi phù hợp với độ tuổi không chỉ giúp bé an toàn mà còn kích thích sự phát triển trí não đúng giai đoạn.</p><h2>Dưới 3 tuổi</h2><p>Ưu tiên đồ chơi kích thước lớn, không có chi tiết nhỏ dễ nuốt, chất liệu mềm và an toàn.</p><h2>Từ 3-6 tuổi</h2><p>Đồ chơi lắp ráp đơn giản, đồ chơi phát triển vận động tinh giúp bé rèn luyện sự khéo léo.</p><h2>Từ 6 tuổi trở lên</h2><p>Bộ lắp ráp phức tạp hơn, đồ chơi giáo dục STEM giúp phát triển tư duy logic.</p>',
+      coverImageUrl: 'https://placehold.co/1200x630/FFD6E8/333333?text=Chon+Do+Choi+Theo+Do+Tuoi',
+      status: 'PUBLISHED',
+      metaTitle: 'Cách chọn đồ chơi phù hợp theo độ tuổi của bé',
+      metaDescription:
+        'Hướng dẫn chọn đồ chơi an toàn và phù hợp với từng giai đoạn phát triển của trẻ.',
+      publishedAt: new Date('2026-02-01T00:00:00.000Z'),
+    },
+  });
+
+  await prisma.blogPost.upsert({
+    where: { slug: 'loi-ich-cua-do-choi-lap-rap-voi-tre-em' },
+    update: {},
+    create: {
+      categoryId: blogCategory.id,
+      title: 'Lợi ích của đồ chơi lắp ráp với sự phát triển của trẻ',
+      slug: 'loi-ich-cua-do-choi-lap-rap-voi-tre-em',
+      excerpt:
+        'Đồ chơi lắp ráp không chỉ mang lại niềm vui mà còn giúp bé phát triển tư duy không gian và kiên nhẫn.',
+      content:
+        '<p>Đồ chơi lắp ráp như LEGO từ lâu đã được các chuyên gia giáo dục khuyến khích sử dụng cho trẻ em.</p><h2>Phát triển tư duy logic</h2><p>Quá trình lắp ráp theo hướng dẫn giúp bé rèn luyện khả năng giải quyết vấn đề từng bước.</p><h2>Rèn luyện sự kiên nhẫn</h2><p>Những bộ lắp ráp phức tạp đòi hỏi bé phải tập trung và kiên trì hoàn thành.</p>',
+      coverImageUrl: 'https://placehold.co/1200x630/D6EFFF/333333?text=Loi+Ich+Do+Choi+Lap+Rap',
+      status: 'PUBLISHED',
+      metaTitle: 'Lợi ích của đồ chơi lắp ráp với sự phát triển của trẻ',
+      metaDescription: 'Tìm hiểu vì sao đồ chơi lắp ráp tốt cho sự phát triển trí tuệ của trẻ em.',
+      publishedAt: new Date('2026-02-10T00:00:00.000Z'),
+    },
+  });
+}
+
 async function main() {
   await seedRolesAndPermissions();
   await seedAdminUser();
   await seedCatalog();
+  await seedContent();
 }
 
 main()
