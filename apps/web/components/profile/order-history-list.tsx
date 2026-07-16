@@ -2,17 +2,8 @@
 
 import Link from 'next/link';
 import { useMyOrders } from '@/hooks/use-orders';
+import { ORDER_STATUS_LABELS } from '@/lib/order-status';
 import { formatVnd } from '@/lib/utils';
-
-const STATUS_LABELS: Record<string, string> = {
-  PENDING: 'Chờ xác nhận',
-  CONFIRMED: 'Đã xác nhận',
-  PROCESSING: 'Đang xử lý',
-  SHIPPED: 'Đang giao hàng',
-  DELIVERED: 'Đã giao hàng',
-  CANCELLED: 'Đã huỷ',
-  REFUNDED: 'Đã hoàn tiền',
-};
 
 export function OrderHistoryList() {
   const { data: orders, isLoading } = useMyOrders(true);
@@ -40,7 +31,7 @@ export function OrderHistoryList() {
           <div className="text-right">
             <p className="font-display font-bold text-primary">{formatVnd(order.total)}</p>
             <p className="text-xs text-muted-foreground">
-              {STATUS_LABELS[order.status] ?? order.status}
+              {ORDER_STATUS_LABELS[order.status] ?? order.status}
             </p>
           </div>
         </Link>

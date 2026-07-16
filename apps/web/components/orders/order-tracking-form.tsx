@@ -11,17 +11,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useOrderTracking } from '@/hooks/use-orders';
 import { ApiError } from '@/lib/api-client';
+import { ORDER_STATUS_LABELS } from '@/lib/order-status';
 import { formatVnd } from '@/lib/utils';
-
-const STATUS_LABELS: Record<string, string> = {
-  PENDING: 'Chờ xác nhận',
-  CONFIRMED: 'Đã xác nhận',
-  PROCESSING: 'Đang xử lý',
-  SHIPPED: 'Đang giao hàng',
-  DELIVERED: 'Đã giao hàng',
-  CANCELLED: 'Đã huỷ',
-  REFUNDED: 'Đã hoàn tiền',
-};
 
 export function OrderTrackingForm() {
   const searchParams = useSearchParams();
@@ -87,7 +78,7 @@ export function OrderTrackingForm() {
           <div className="flex items-center justify-between">
             <h2 className="font-display text-lg font-bold">{order.orderNumber}</h2>
             <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">
-              {STATUS_LABELS[order.status] ?? order.status}
+              {ORDER_STATUS_LABELS[order.status] ?? order.status}
             </span>
           </div>
 
@@ -99,7 +90,7 @@ export function OrderTrackingForm() {
                     index === order.statusHistory.length - 1 ? 'bg-primary' : 'bg-muted-foreground'
                   }`}
                 />
-                <p className="text-sm font-semibold">{STATUS_LABELS[entry.status] ?? entry.status}</p>
+                <p className="text-sm font-semibold">{ORDER_STATUS_LABELS[entry.status] ?? entry.status}</p>
                 {entry.note && <p className="text-xs text-muted-foreground">{entry.note}</p>}
                 <p className="text-xs text-muted-foreground">
                   {new Date(entry.createdAt).toLocaleString('vi-VN')}

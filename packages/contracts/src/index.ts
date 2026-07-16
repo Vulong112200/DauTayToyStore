@@ -8,3 +8,4 @@ export * from './orders/schemas.js';
 export * from './wishlist/schemas.js';
 export * from './addresses/schemas.js';
 export * from './content/schemas.js';
+export * from './admin/schemas.js';

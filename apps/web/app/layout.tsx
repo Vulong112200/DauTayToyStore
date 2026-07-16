@@ -2,8 +2,6 @@ import type { Metadata } from 'next';
 import { Baloo_2, Be_Vietnam_Pro } from 'next/font/google';
 import { QueryProvider } from '@/components/providers/query-provider';
 import { ThemeProvider } from '@/components/providers/theme-provider';
-import { SiteHeader } from '@/components/layout/site-header';
-import { SiteFooter } from '@/components/layout/site-footer';
 import { env } from '@/lib/env';
 import './globals.css';
 
@@ -48,13 +46,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="vi" suppressHydrationWarning>
       <body className={`${beVietnamPro.variable} ${baloo2.variable} font-sans`}>
         <ThemeProvider>
-          <QueryProvider>
-            <div className="flex min-h-screen flex-col">
-              <SiteHeader />
-              <main className="flex-1">{children}</main>
-              <SiteFooter />
-            </div>
-          </QueryProvider>
+          <QueryProvider>{children}</QueryProvider>
         </ThemeProvider>
       </body>
     </html>

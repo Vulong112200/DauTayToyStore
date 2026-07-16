@@ -1,5 +1,64 @@
 # Architecture Decisions
 
+## Phase 3 — Admin foundation + Product management
+
+### Route group refactor: `(public)` vs `/admin`
+
+Every customer-facing route previously rendered inside the root `app/layout.tsx`, which
+hard-coded `<SiteHeader/>`/`<SiteFooter/>` around `{children}` — meaning an admin section
+nested anywhere under it would inherit the public storefront chrome. Fixed by moving every
+existing route (all of `about`, `blog`, `cart`, `categories`, `checkout`, `contact`, `faq`,
+`order-confirmation`, `order-tracking`, `page.tsx`, `privacy-policy`, `products`, `profile`,
+`terms`, `wishlist`, and the `(auth)` group) into a new `app/(public)/` route group, with
+`SiteHeader`/`SiteFooter` moved into `app/(public)/layout.tsx`. Route groups are purely
+organizational — none of these URLs changed. The root layout now only owns `<html>/<body>`,
+fonts, and the Theme/Query providers; `/admin` sits as a sibling of `(public)` with its own
+sidebar-based chrome (`app/admin/layout.tsx`) and its own `AdminGuard` client component
+(redirects to `/login` if logged out, shows a 403-style message if logged in but not
+ADMIN/SUPER_ADMIN/STAFF).
+
+### Admin pages must opt out of static prerendering
+
+`next build` failed on `/admin/brands` with `Cannot read properties of undefined (reading
+'hasHydrated')` — Next attempts to statically prerender any page (including `'use client'`
+ones) that doesn't otherwise force dynamic rendering, which runs the component tree once in a
+server/Node context. `AdminGuard`'s `useAuthHydrated()` hook calls
+`useAuthStore.persist.hasHydrated()`, and the persisted store's browser-only machinery isn't
+available in that prerender pass. Since every `/admin/*` page is inherently per-session
+(behind a client-side, localStorage-backed auth check) there is no valid static version of it
+to prerender anyway — fixed with `export const dynamic = 'force-dynamic'` in `app/admin/layout.tsx`,
+which propagates to all nested admin routes.
+
+### Role checks: class-level default + method-level override
+
+Every new admin controller (`AdminProductsController`, `AdminCategoriesController`,
+`AdminBrandsController`) sets a permissive class-level `@Roles(ADMIN, SUPER_ADMIN, STAFF)` (so
+STAFF can read/update), then overrides specific mutating endpoints — `create`/`remove` — with a
+tighter method-level `@Roles(ADMIN, SUPER_ADMIN)`. This relies on `RolesGuard`'s
+`reflector.getAllAndOverride` resolving handler-level metadata before class-level, which was
+already established in Phase 1/2 — this phase is the first to actually exercise the "override"
+half of that behavior (previously every controller only set roles in one place). Verified
+against live Supabase: a CUSTOMER-role token gets a real 403 from `/admin/products`, not just a
+theoretical guard.
+
+### Product `DELETE` archives, it doesn't delete
+
+`OrderItem.product` is `onDelete: Restrict`, so a product referenced by any historical order can
+never be hard-deleted regardless of what the admin UI calls the action. `AdminProductsService.remove`
+sets `status: 'ARCHIVED'` instead — same REST verb/endpoint shape the frontend expects, honest
+behavior underneath. Category and Brand deletes stay real hard deletes: both of their product
+relations are `onDelete: Cascade`/`SetNull` respectively, so removing either cannot violate a
+foreign key.
+
+### Product edit replaces nested collections wholesale, not via diffing
+
+`AdminProductsService.update` deletes and recreates `images`/`specifications`/`faqs`/`categories`
+inside one transaction on every save, rather than computing which rows changed. For an admin
+form where the whole nested-array state is already round-tripped from the client on every
+submit (via `useFieldArray`), diffing would add real complexity for no behavioral difference —
+the end state is identical either way, and the row count here is small (a handful of images/specs
+per product, not thousands).
+
 ## Phase 2 — Wishlist + Profile
 
 ### Extracted `product-list.util.ts` before adding Wishlist
