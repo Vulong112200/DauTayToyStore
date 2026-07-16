@@ -1,5 +1,44 @@
 # Architecture Decisions
 
+## Phase 3 — Blog + Banner management
+
+### Blog categories can be hard-deleted; blog posts can too — neither has a Restrict FK
+
+Unlike `Product` (kept as archive-only because `OrderItem.product` is `onDelete: Restrict`),
+`BlogCategory.posts` is `onDelete: SetNull` and nothing references `BlogPost` at all. Both
+`AdminBlogCategoriesService.remove` and `AdminBlogPostsService.remove` do a real
+`prisma.*.delete`, matching the categories/brands precedent rather than the products one.
+Deleting a category in use doesn't cascade-delete its posts — it just nulls their `categoryId`,
+verified live by deleting a test category that had 2 posts and confirming both posts survived
+with `categoryName: null` on the next list fetch.
+
+### `publishedAt` is stamped once, on the transition into `PUBLISHED`, never recomputed
+
+Same rule as `Product.publishedAt`: `create`/`update` only set `publishedAt: new Date()` when
+`status === 'PUBLISHED'` AND no `publishedAt` already exists; editing an already-published post
+(title, content, etc.) leaves its original `publishedAt` untouched so the public blog's
+"newest first" ordering doesn't reshuffle every time an admin fixes a typo. Verified live:
+publishing a draft stamps `publishedAt`; a second edit while already `PUBLISHED` returns the same
+timestamp.
+
+### Two admin blog controllers, not one, mirroring how categories/brands are separate from products
+
+`AdminBlogCategoriesController` (`/admin/blog-categories`) and `AdminBlogPostsController`
+(`/admin/blog-posts`) are independent — a post's `categoryId` is optional and posts can exist
+uncategorized, so category management doesn't need to be nested under posts. Both share the
+existing public `BlogController`'s module (`blog.module.ts`) since they operate on the same two
+Prisma models; a genuinely new domain (`Banner`, no prior code at all) got its own module
+(`content/banner/`) instead.
+
+### Banner has no public read endpoint yet
+
+This slice only builds the admin CRUD (`/admin/banners`), matching the user-selected scope
+("Blog + Banner management" as an admin-panel slice, not a storefront feature). No homepage or
+category-page component currently renders banners — wiring `Banner` into the public site is
+left for whenever that UI work is scheduled, so shipping a public `GET /banners` endpoint now
+would be unused surface area. `startsAt`/`endsAt` are stored but not yet enforced by any
+"currently active" filter for the same reason — there's no consumer yet to filter for.
+
 ## Phase 3 — User Management + Roles
 
 ### Role-escalation and self-lockout guards live in the service, not the guard layer

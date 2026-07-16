@@ -5,7 +5,9 @@ import { usePathname } from 'next/navigation';
 import {
   Boxes,
   FolderTree,
+  Image as ImageIcon,
   LayoutDashboard,
+  Newspaper,
   Package,
   ShoppingBag,
   Tag,
@@ -20,6 +22,9 @@ const NAV_ITEMS = [
   { href: '/admin/inventory', label: 'Tồn kho', icon: Boxes },
   { href: '/admin/categories', label: 'Danh mục', icon: FolderTree },
   { href: '/admin/brands', label: 'Thương hiệu', icon: Tag },
+  { href: '/admin/blog', label: 'Bài viết', icon: Newspaper },
+  { href: '/admin/blog-categories', label: 'Danh mục blog', icon: FolderTree },
+  { href: '/admin/banners', label: 'Banner', icon: ImageIcon },
   { href: '/admin/users', label: 'Người dùng', icon: Users },
 ];
 
@@ -36,7 +41,8 @@ export function AdminSidebar() {
       <nav className="space-y-1 p-4">
         {NAV_ITEMS.map((item) => {
           const isActive =
-            pathname === item.href || (item.href !== '/admin' && pathname.startsWith(item.href));
+            pathname === item.href ||
+            (item.href !== '/admin' && pathname.startsWith(`${item.href}/`));
           const Icon = item.icon;
           return (
             <Link

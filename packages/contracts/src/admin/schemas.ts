@@ -308,3 +308,106 @@ export const updateUserRolesInputSchema = z.object({
   roles: z.array(z.nativeEnum(RoleName)).min(1, 'Phải có ít nhất 1 vai trò'),
 });
 export type UpdateUserRolesInput = z.infer<typeof updateUserRolesInputSchema>;
+
+// --- Admin blog ---
+
+export const blogStatusSchema = z.enum(['DRAFT', 'PUBLISHED']);
+export type BlogPostStatus = z.infer<typeof blogStatusSchema>;
+
+export const blogCategoryInputSchema = z.object({
+  name: z.string().min(2, 'Tên quá ngắn').max(100),
+  slug: slugSchema,
+});
+export type BlogCategoryInput = z.infer<typeof blogCategoryInputSchema>;
+
+export const adminBlogCategorySchema = z.object({
+  id: z.string().uuid(),
+  name: z.string(),
+  slug: z.string(),
+  postCount: z.number().int(),
+});
+export type AdminBlogCategory = z.infer<typeof adminBlogCategorySchema>;
+
+export const blogPostInputSchema = z.object({
+  title: z.string().min(2, 'Tiêu đề quá ngắn').max(200),
+  slug: slugSchema,
+  excerpt: z.string().max(300).optional(),
+  content: z.string().min(1, 'Nội dung không được để trống'),
+  coverImageUrl: z.string().url('URL ảnh không hợp lệ').optional(),
+  categoryId: z.string().uuid().optional(),
+  status: blogStatusSchema.default('DRAFT'),
+  metaTitle: z.string().max(160).optional(),
+  metaDescription: z.string().max(300).optional(),
+});
+export type BlogPostInput = z.infer<typeof blogPostInputSchema>;
+
+export const adminBlogPostListItemSchema = z.object({
+  id: z.string().uuid(),
+  title: z.string(),
+  slug: z.string(),
+  status: blogStatusSchema,
+  categoryName: z.string().nullable(),
+  publishedAt: z.string().datetime().nullable(),
+  updatedAt: z.string().datetime(),
+});
+export type AdminBlogPostListItem = z.infer<typeof adminBlogPostListItemSchema>;
+
+export const adminBlogPostQuerySchema = z.object({
+  page: z.coerce.number().int().min(1).default(1),
+  pageSize: z.coerce.number().int().min(1).max(100).default(20),
+  q: z.string().optional(),
+  status: blogStatusSchema.optional(),
+});
+export type AdminBlogPostQuery = z.infer<typeof adminBlogPostQuerySchema>;
+
+export const adminBlogPostDetailSchema = z.object({
+  id: z.string().uuid(),
+  title: z.string(),
+  slug: z.string(),
+  excerpt: z.string().nullable(),
+  content: z.string(),
+  coverImageUrl: z.string().nullable(),
+  categoryId: z.string().uuid().nullable(),
+  status: blogStatusSchema,
+  metaTitle: z.string().nullable(),
+  metaDescription: z.string().nullable(),
+  publishedAt: z.string().datetime().nullable(),
+  createdAt: z.string().datetime(),
+  updatedAt: z.string().datetime(),
+});
+export type AdminBlogPostDetail = z.infer<typeof adminBlogPostDetailSchema>;
+
+// --- Admin banners ---
+
+export const bannerPositionSchema = z.enum([
+  'HOME_HERO',
+  'HOME_MIDDLE',
+  'CATEGORY_TOP',
+  'SIDEBAR',
+]);
+export type BannerPosition = z.infer<typeof bannerPositionSchema>;
+
+export const bannerInputSchema = z.object({
+  title: z.string().min(2, 'Tiêu đề quá ngắn').max(150),
+  imageUrl: z.string().url('URL ảnh không hợp lệ'),
+  linkUrl: z.string().url('URL liên kết không hợp lệ').optional(),
+  position: bannerPositionSchema,
+  sortOrder: z.coerce.number().int().default(0),
+  isActive: z.boolean().default(true),
+  startsAt: z.string().datetime().optional(),
+  endsAt: z.string().datetime().optional(),
+});
+export type BannerInput = z.infer<typeof bannerInputSchema>;
+
+export const adminBannerSchema = z.object({
+  id: z.string().uuid(),
+  title: z.string(),
+  imageUrl: z.string(),
+  linkUrl: z.string().nullable(),
+  position: bannerPositionSchema,
+  sortOrder: z.number().int(),
+  isActive: z.boolean(),
+  startsAt: z.string().datetime().nullable(),
+  endsAt: z.string().datetime().nullable(),
+});
+export type AdminBanner = z.infer<typeof adminBannerSchema>;
