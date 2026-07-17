@@ -4,11 +4,12 @@ import * as React from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Heart, Menu, Search, ShoppingCart, User, X } from 'lucide-react';
+import { Heart, LayoutDashboard, Menu, Search, ShoppingCart, User, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ThemeToggle } from '@/components/theme-toggle';
 import { useCart } from '@/hooks/use-cart';
 import { useWishlist } from '@/hooks/use-wishlist';
+import { isAdminUser } from '@/lib/auth';
 import { cn } from '@/lib/utils';
 import { useAuthStore } from '@/store/auth-store';
 
@@ -31,6 +32,7 @@ export function SiteHeader() {
   const { data: wishlist } = useWishlist(!!user);
   const itemCount = cart?.itemCount ?? 0;
   const wishlistCount = wishlist?.items.length ?? 0;
+  const isAdmin = isAdminUser(user);
 
   function handleSearchSubmit(event: React.FormEvent) {
     event.preventDefault();
@@ -82,6 +84,19 @@ export function SiteHeader() {
 
         <div className="flex items-center gap-1">
           <ThemeToggle />
+          {isAdmin && (
+            <Button
+              variant="ghost"
+              size="icon"
+              asChild
+              aria-label="Trang quản trị"
+              className="hidden sm:inline-flex"
+            >
+              <Link href="/admin">
+                <LayoutDashboard className="h-5 w-5" />
+              </Link>
+            </Button>
+          )}
           <Button
             variant="ghost"
             size="icon"
@@ -156,6 +171,15 @@ export function SiteHeader() {
           >
             {user ? 'Tài khoản của tôi' : 'Đăng nhập / Đăng ký'}
           </Link>
+          {isAdmin && (
+            <Link
+              href="/admin"
+              className="rounded-lg px-3 py-2 text-sm font-medium hover:bg-muted"
+              onClick={() => setMobileOpen(false)}
+            >
+              Trang quản trị
+            </Link>
+          )}
         </nav>
       </div>
     </header>
