@@ -1,6 +1,7 @@
 import type { AuthResponse } from '@repo/contracts';
 import { useAuthStore } from '@/store/auth-store';
 import { env } from './env';
+import { getQueryClient } from './query-client';
 
 export class ApiError extends Error {
   constructor(
@@ -54,6 +55,10 @@ async function runRefresh(): Promise<boolean> {
       // surfaces its own error and can simply be retried once the API is awake.
       if (response.status === 401 || response.status === 403) {
         useAuthStore.getState().clearSession();
+        // Drop the signed-out user's cached per-user data (wishlist, orders,
+        // profile) so it can't linger on screen after a reactive logout — the
+        // explicit logout in profile-view already does this; this path didn't.
+        getQueryClient()?.clear();
       }
       return false;
     }

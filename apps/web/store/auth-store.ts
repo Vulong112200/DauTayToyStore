@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
 import type { AuthTokens, UserProfile } from '@repo/contracts';
+import { getQueryClient } from '@/lib/query-client';
 
 interface AuthState {
   user: UserProfile | null;
@@ -35,8 +36,18 @@ export const useAuthStore = create<AuthState>()(
 // last refreshed, logged in, or logged out.
 if (typeof window !== 'undefined') {
   window.addEventListener('storage', (event) => {
-    if (event.key === AUTH_STORAGE_KEY || event.key === null) {
-      void useAuthStore.persist.rehydrate();
-    }
+    if (event.key !== AUTH_STORAGE_KEY && event.key !== null) return;
+    const previousUserId = useAuthStore.getState().user?.id;
+    Promise.resolve(useAuthStore.persist.rehydrate())
+      .then(() => {
+        // If the synced change was a logout or a switch to a different account
+        // (not just a token rotation for the same user), drop this tab's cached
+        // per-user data so the previous user's wishlist/cart doesn't linger.
+        if (useAuthStore.getState().user?.id !== previousUserId) getQueryClient()?.clear();
+      })
+      .catch(() => {
+        // A corrupt/unreadable persisted value must not surface as an unhandled
+        // rejection; the in-memory session simply stays as-is.
+      });
   });
 }

@@ -1,10 +1,19 @@
 'use client';
 
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import type { ProductListItem, WishlistView } from '@repo/contracts';
 import { wishlistApi } from '@/lib/api/wishlist';
 
 export const WISHLIST_QUERY_KEY = ['wishlist'] as const;
+
+// Restore the pre-optimistic snapshot on a failed toggle. When there was no
+// cached wishlist yet (previous === undefined — e.g. the heart was clicked
+// before the wishlist query resolved), removeQueries clears the fabricated
+// optimistic item so the heart doesn't stay stuck filled.
+function rollbackWishlist(queryClient: QueryClient, context: { previous?: WishlistView } | undefined) {
+  if (context?.previous) queryClient.setQueryData(WISHLIST_QUERY_KEY, context.previous);
+  else queryClient.removeQueries({ queryKey: WISHLIST_QUERY_KEY });
+}
 
 export function useWishlist(enabled: boolean) {
   return useQuery({
@@ -47,9 +56,7 @@ export function useAddToWishlist() {
       });
       return { previous };
     },
-    onError: (_error, _variables, context) => {
-      if (context?.previous) queryClient.setQueryData(WISHLIST_QUERY_KEY, context.previous);
-    },
+    onError: (_error, _variables, context) => rollbackWishlist(queryClient, context),
     onSuccess: (data) => queryClient.setQueryData(WISHLIST_QUERY_KEY, data),
   });
 }
@@ -66,9 +73,7 @@ export function useRemoveFromWishlist() {
       );
       return { previous };
     },
-    onError: (_error, _variables, context) => {
-      if (context?.previous) queryClient.setQueryData(WISHLIST_QUERY_KEY, context.previous);
-    },
+    onError: (_error, _variables, context) => rollbackWishlist(queryClient, context),
     onSuccess: (data) => queryClient.setQueryData(WISHLIST_QUERY_KEY, data),
   });
 }
