@@ -1,4 +1,7 @@
-import { PrismaClient, RoleName } from '@prisma/client';
+import { readFileSync } from 'fs';
+import { join } from 'path';
+import { PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
+import { MediaType, PrismaClient, RoleName } from '@prisma/client';
 import * as argon2 from 'argon2';
 
 const prisma = new PrismaClient();
@@ -878,10 +881,14 @@ async function seedContent() {
 }
 
 // Maps each product/blog slug to a real demo image bundled in the web app's
-// public/ folder (served by Next.js at `/demo/...`). Kept separate from the
-// product/blog `create` blocks above because those upsert with `update: {}` —
-// a no-op on rows that already exist — so this reconcile pass is what actually
-// (re)applies images on every seed run, to both new and pre-existing rows.
+// public/demo folder (the reproducible source). At seed time each image is
+// uploaded to Cloudflare R2 and the record points at the R2 URL — mirroring the
+// production admin flow (AdminMediaService.upload: R2 write + MediaAsset row) —
+// falling back to the local `/demo/...` path only when R2 isn't configured.
+// Kept separate from the product/blog `create` blocks above because those
+// upsert with `update: {}` — a no-op on rows that already exist — so this
+// reconcile pass is what actually (re)applies images on every seed run, to
+// both new and pre-existing rows.
 const PRODUCT_IMAGES: Record<string, string> = {
   'lego-city-xe-cuu-hoa': '/demo/lego-fire-truck.jpg',
   'lego-friends-heartlake-city': '/demo/lego-friends.jpg',
@@ -917,10 +924,70 @@ const BLOG_COVERS: Record<string, string> = {
   'loi-ich-cua-do-choi-lap-rap-voi-tre-em': '/demo/blog/lego-bricks.jpg',
 };
 
+const r2Enabled = Boolean(
+  process.env.R2_ACCOUNT_ID &&
+    process.env.R2_ACCESS_KEY_ID &&
+    process.env.R2_SECRET_ACCESS_KEY &&
+    process.env.R2_BUCKET_NAME &&
+    process.env.R2_PUBLIC_URL,
+);
+
+function getR2Client(): S3Client {
+  return new S3Client({
+    region: 'auto',
+    endpoint: `https://${process.env.R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
+    credentials: {
+      accessKeyId: process.env.R2_ACCESS_KEY_ID as string,
+      secretAccessKey: process.env.R2_SECRET_ACCESS_KEY as string,
+    },
+  });
+}
+
+// Uploads a bundled demo image to R2 (mirroring AdminMediaService.upload's R2
+// write + MediaAsset row) and returns its public URL. Uses a stable key so
+// re-running the seed overwrites the same object/row instead of duplicating.
+// Falls back to the local `/demo/...` path when R2 isn't configured.
+async function resolveDemoImageUrl(client: S3Client | null, localUrl: string): Promise<string> {
+  const fileName = localUrl.replace(/^\/demo\//, '');
+  if (!client) return localUrl;
+
+  const key = `demo/${fileName}`;
+  const body = readFileSync(join(__dirname, '../../web/public/demo', fileName));
+  await client.send(
+    new PutObjectCommand({
+      Bucket: process.env.R2_BUCKET_NAME as string,
+      Key: key,
+      Body: body,
+      ContentType: 'image/jpeg',
+    }),
+  );
+  const url = `${(process.env.R2_PUBLIC_URL as string).replace(/\/$/, '')}/${key}`;
+
+  await prisma.mediaAsset.upsert({
+    where: { key },
+    update: { url, sizeBytes: body.length },
+    create: {
+      key,
+      url,
+      type: MediaType.IMAGE,
+      mimeType: 'image/jpeg',
+      sizeBytes: body.length,
+    },
+  });
+
+  return url;
+}
+
 async function seedDemoImages() {
-  for (const [slug, url] of Object.entries(PRODUCT_IMAGES)) {
+  const client = r2Enabled ? getR2Client() : null;
+  if (!client) {
+    console.warn('R2 not configured — seeding local /demo image paths instead of R2 URLs.');
+  }
+
+  for (const [slug, localUrl] of Object.entries(PRODUCT_IMAGES)) {
     const product = await prisma.product.findUnique({ where: { slug } });
     if (!product) continue;
+    const url = await resolveDemoImageUrl(client, localUrl);
     // Replace all images so this is idempotent regardless of prior state.
     await prisma.productImage.deleteMany({ where: { productId: product.id } });
     await prisma.productImage.create({
@@ -934,7 +1001,8 @@ async function seedDemoImages() {
     });
   }
 
-  for (const [slug, coverImageUrl] of Object.entries(BLOG_COVERS)) {
+  for (const [slug, localUrl] of Object.entries(BLOG_COVERS)) {
+    const coverImageUrl = await resolveDemoImageUrl(client, localUrl);
     await prisma.blogPost.updateMany({ where: { slug }, data: { coverImageUrl } });
   }
 }
