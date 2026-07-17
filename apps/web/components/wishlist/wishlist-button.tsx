@@ -5,10 +5,10 @@ import { useRouter } from 'next/navigation';
 import { Heart } from 'lucide-react';
 import type { ProductListItem } from '@repo/contracts';
 import { useAuthStore } from '@/store/auth-store';
-import { useAddToWishlist, useRemoveFromWishlist, useWishlist } from '@/hooks/use-wishlist';
+import { useAddToWishlist, useIsInWishlist, useRemoveFromWishlist } from '@/hooks/use-wishlist';
 import { cn } from '@/lib/utils';
 
-export function WishlistButton({
+function WishlistButtonImpl({
   product,
   className,
 }: {
@@ -17,11 +17,9 @@ export function WishlistButton({
 }) {
   const router = useRouter();
   const user = useAuthStore((state) => state.user);
-  const { data: wishlist } = useWishlist(!!user);
+  const { data: isInWishlist = false } = useIsInWishlist(product.id, !!user);
   const addToWishlist = useAddToWishlist();
   const removeFromWishlist = useRemoveFromWishlist();
-
-  const isInWishlist = wishlist?.items.some((item) => item.productId === product.id) ?? false;
   // Guard against rapid double-clicks racing two mutations to out-of-order
   // resolution — but note the heart itself already reflects the change
   // optimistically, so this disable is invisible, not the old "frozen" feel.
@@ -62,3 +60,5 @@ export function WishlistButton({
     </button>
   );
 }
+
+export const WishlistButton = React.memo(WishlistButtonImpl);

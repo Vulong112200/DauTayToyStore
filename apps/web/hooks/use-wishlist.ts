@@ -14,6 +14,19 @@ export function useWishlist(enabled: boolean) {
   });
 }
 
+// Per-product membership selector. Each WishlistButton subscribes only to its own
+// boolean, so toggling one heart re-renders that one button — not every card in
+// the grid (TanStack Query re-renders a subscriber only when its *selected* value
+// changes, and does the O(items) scan against the cached list, never a refetch).
+export function useIsInWishlist(productId: string, enabled: boolean) {
+  return useQuery({
+    queryKey: WISHLIST_QUERY_KEY,
+    queryFn: wishlistApi.get,
+    enabled,
+    select: (data) => data.items.some((item) => item.productId === productId),
+  });
+}
+
 // Optimistic add: the heart fills the instant it's clicked instead of waiting a
 // full API round-trip (which, on the free Render tier, can include a cold start).
 // We carry the full `product` in the mutation variables — only `productId` is
