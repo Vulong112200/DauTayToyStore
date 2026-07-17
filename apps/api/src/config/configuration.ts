@@ -40,6 +40,14 @@ export function buildConfiguration(env: EnvConfig) {
       paymentUrl: env.VNPAY_PAYMENT_URL,
       returnUrl: env.VNPAY_RETURN_URL,
     },
+    momo: {
+      partnerCode: env.MOMO_PARTNER_CODE,
+      accessKey: env.MOMO_ACCESS_KEY,
+      secretKey: env.MOMO_SECRET_KEY,
+      endpoint: env.MOMO_ENDPOINT,
+      redirectUrl: env.MOMO_REDIRECT_URL,
+      ipnUrl: env.MOMO_IPN_URL,
+    },
     throttle: {
       ttlMs: env.THROTTLE_TTL_MS,
       limit: env.THROTTLE_LIMIT,

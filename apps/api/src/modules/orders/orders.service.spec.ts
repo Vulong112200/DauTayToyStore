@@ -1,6 +1,7 @@
 import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { PromotionContextService } from '../../common/promotion-context/promotion-context.service';
 import { PrismaService } from '../../infra/prisma/prisma.service';
+import { MomoService } from '../payments/momo.service';
 import { VnpayService } from '../payments/vnpay.service';
 import { AdminSettingsService } from '../settings/admin-settings.service';
 import { OrdersService } from './orders.service';
@@ -9,6 +10,7 @@ describe('OrdersService', () => {
   let service: OrdersService;
   let adminSettingsService: { getSettings: jest.Mock };
   let vnpayService: { buildPaymentUrl: jest.Mock };
+  let momoService: { createPayment: jest.Mock };
   let promotionContext: {
     loadFlashSaleItems: jest.Mock;
     loadComboDeals: jest.Mock;
@@ -94,11 +96,15 @@ describe('OrdersService', () => {
     vnpayService = {
       buildPaymentUrl: jest.fn().mockReturnValue('https://sandbox.vnpayment.vn/paymentv2/vpcpay.html?mock=1'),
     };
+    momoService = {
+      createPayment: jest.fn().mockResolvedValue('https://test-payment.momo.vn/pay/mock'),
+    };
     service = new OrdersService(
       prisma as unknown as PrismaService,
       adminSettingsService as unknown as AdminSettingsService,
       promotionContext as unknown as PromotionContextService,
       vnpayService as unknown as VnpayService,
+      momoService as unknown as MomoService,
     );
   });
 
@@ -220,6 +226,35 @@ describe('OrdersService', () => {
         ipAddr: '203.0.113.5',
       });
       expect(result.paymentUrl).toBe('https://sandbox.vnpayment.vn/paymentv2/vpcpay.html?mock=1');
+    });
+
+    it('creates a MOMO payment and returns a paymentUrl instead of null', async () => {
+      prisma.cart.findFirst.mockResolvedValue(cartWithItems([publishedItem()]));
+      prisma.order.create.mockResolvedValue({
+        orderNumber: 'DTT12345678',
+        items: [{ product: { slug: 'lego-city' } }],
+        statusHistory: [],
+        createdAt: new Date('2026-01-01'),
+      });
+
+      const result = await service.checkout(
+        { sessionId: 's1' },
+        { ...checkoutInput, paymentMethod: 'MOMO' },
+        '203.0.113.5',
+      );
+
+      expect(prisma.order.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            payment: { create: { method: 'MOMO', status: 'PENDING', amount: 230000 } },
+          }),
+        }),
+      );
+      expect(momoService.createPayment).toHaveBeenCalledWith({
+        orderNumber: 'DTT12345678',
+        amount: 230000,
+      });
+      expect(result.paymentUrl).toBe('https://test-payment.momo.vn/pay/mock');
     });
 
     it('applies free shipping above the threshold', async () => {

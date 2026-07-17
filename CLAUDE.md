@@ -9,8 +9,8 @@ system (web + API meant to also serve a future mobile app), not a simple storefr
 (customer-facing catalog/cart/checkout/wishlist/profile/blog/etc.) and Phase 3 (full admin panel
 — see below) are both built. Phase 4 (permission-level RBAC, real outbound email, the shared
 promotion/pricing engine wiring FlashSale/ComboDeal/BuyXGetYRule/FreeShippingRule/GiftVoucher into
-checkout, and a first real payment gateway — VNPay, sandbox-only so far) is also built. Still
-planned but not built: MoMo/Stripe as additional payment gateways, and AI modules (image
+checkout, and two real payment gateways — VNPay and MoMo, both sandbox-only so far) is also built.
+Still planned but not built: Stripe as an additional payment gateway, and AI modules (image
 compression/background removal). See `docs/architecture.md` for the full log of architecture
 decisions and their rationale, and `docs/ERD.md` for the database diagram.
 
@@ -125,19 +125,27 @@ confirmation page (also the normal path after a VNPay redirect, since the browse
 entirely) degrades to pointing at `/order-tracking` (which does need the email, since that's an
 intentional cross-session lookup).
 
-**Payments** (`modules/payments/`): `checkoutSchema.paymentMethod` (`'COD' | 'VNPAY'`, default
-`'COD'`) branches `OrdersService.checkout` — COD is unchanged; VNPay additionally returns a
-`paymentUrl` the frontend redirects the browser to. VNPay confirms payment through two channels
-that can race (the browser's return redirect and VNPay's own server-to-server IPN), so
-`PaymentsService.confirmVnpayPayment` uses an atomic `updateMany({ where: { status: 'PENDING' } })`
+**Payments** (`modules/payments/`): `checkoutSchema.paymentMethod` (`'COD' | 'VNPAY' | 'MOMO'`,
+default `'COD'`) branches `OrdersService.checkout` — COD is unchanged; VNPay/MoMo additionally
+return a `paymentUrl` the frontend redirects the browser to (VNPay builds this URL purely
+locally; MoMo instead makes a real outbound API call to MoMo during checkout to obtain it — a
+failure there after the Order+Payment(PENDING) row already committed is a documented known gap,
+not auto-recovered). Both gateways confirm payment through two channels that can race (the
+browser's return redirect and the gateway's own server-to-server IPN — VNPay's IPN is GET query
+params acknowledged with `{RspCode,Message}` JSON, MoMo's is POST JSON body acknowledged with a
+bare HTTP 204), so `PaymentsService`'s shared private `confirmPaymentCore` (wrapped by
+`confirmVnpayPayment`/`confirmMomoPayment`) uses an atomic `updateMany({ where: { status: 'PENDING' } })`
 compare-and-swap as the idempotency boundary — never a `findUnique`-then-branch — so whichever
-channel arrives first wins and the other safely no-ops. Every outcome (success, failure, amount
-mismatch, already-processed) is recorded as an `OrderStatusHistory` note, including the case where
-payment succeeds after an order was already moved on from (e.g. admin-cancelled while payment was
-in flight) — flagged loudly since there's no automatic VNPay refund call yet, only a manual
-merchant-portal process. See `docs/architecture.md`'s "Phase 4+ — VNPay payment gateway" section
-for the signature-encoding gotcha (VNPay's `+`-for-space convention, not plain
-`encodeURIComponent`) and the full out-of-scope list (MoMo/Stripe, admin refund UI, payment retry).
+channel arrives first wins and the other safely no-ops; each gateway's own service computes
+`isSuccess` using its own response-code convention before calling in, so the shared core never
+needs to know either gateway's semantics. Every outcome (success, failure, amount mismatch,
+already-processed) is recorded as an `OrderStatusHistory` note, including the case where payment
+succeeds after an order was already moved on from (e.g. admin-cancelled while payment was in
+flight) — flagged loudly since there's no automatic refund call for either gateway yet, only a
+manual merchant-portal process. See `docs/architecture.md`'s "Phase 4+ — VNPay payment gateway"
+and "Phase 4+ — MoMo payment gateway" sections for the signature-encoding gotchas (VNPay's
+`+`-for-space convention vs MoMo's fixed-field-list HMAC-SHA256, neither URL-encoded) and the
+full out-of-scope list (Stripe, admin refund UI, payment retry).
 
 **Admin panel** (`apps/api/src/modules/<domain>` — controllers/services prefixed `Admin*`;
 `apps/web/app/admin/*`): every admin controller is class-decorated with `@Roles(...)` (STAFF
@@ -226,6 +234,14 @@ integer math — no cents/decimal handling anywhere. Frontend formats via
   `docs/deployment.md`), then separately register the IPN URL
   (`<API public URL>/api/payments/vnpay/ipn`) inside the VNPay merchant dashboard itself. Until
   then, COD checkout is unaffected but choosing VNPay at checkout fails with a clear error.
+- **Register a MoMo merchant/test account and set `MOMO_PARTNER_CODE`/`MOMO_ACCESS_KEY`/
+  `MOMO_SECRET_KEY`/`MOMO_REDIRECT_URL`/`MOMO_IPN_URL` on the Render deploy** (MoMo does not
+  publish shared public test credentials — register at business.momo.vn or email
+  merchant.care@momo.vn — see `docs/deployment.md`). Unlike VNPay, no separate merchant-dashboard
+  IPN registration step exists (`MOMO_IPN_URL` travels per-request), but double-check it's a
+  publicly reachable, TLS-valid host before the first sandbox transaction — MoMo won't reject a
+  bad URL at request time, delivery just silently fails later. Until set, COD/VNPay checkout is
+  unaffected but choosing MoMo at checkout fails with a clear error.
 - After fixing the above and actually deploying, **update this file's "Project" section and this
   TODO list** to reflect the new state (remove fixed items, note the live deploy URLs/setup if
   relevant) — don't leave stale TODOs here once they're done.

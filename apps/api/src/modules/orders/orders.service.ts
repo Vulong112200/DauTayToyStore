@@ -12,6 +12,7 @@ import { assertVoucherUsable, computeVoucherDiscount } from '../../common/utils/
 import { resolveAvailableStock } from '../../common/utils/inventory.util';
 import { resolveFreeShipping, runPromotionEngine } from '../../common/utils/promotion-engine.util';
 import { PrismaService } from '../../infra/prisma/prisma.service';
+import { MomoService } from '../payments/momo.service';
 import { VnpayService } from '../payments/vnpay.service';
 import { AdminSettingsService } from '../settings/admin-settings.service';
 import { ORDER_VIEW_INCLUDE, toOrderView } from './order-view.util';
@@ -46,6 +47,7 @@ export class OrdersService {
     private readonly adminSettingsService: AdminSettingsService,
     private readonly promotionContext: PromotionContextService,
     private readonly vnpayService: VnpayService,
+    private readonly momoService: MomoService,
   ) {}
 
   async checkout(
@@ -260,10 +262,21 @@ export class OrdersService {
       return created;
     });
 
-    const paymentUrl =
-      input.paymentMethod === 'VNPAY'
-        ? this.vnpayService.buildPaymentUrl({ orderNumber: order.orderNumber, amount: total, ipAddr })
-        : null;
+    let paymentUrl: string | null = null;
+    if (input.paymentMethod === 'VNPAY') {
+      paymentUrl = this.vnpayService.buildPaymentUrl({
+        orderNumber: order.orderNumber,
+        amount: total,
+        ipAddr,
+      });
+    } else if (input.paymentMethod === 'MOMO') {
+      // Unlike VNPay's purely local URL construction, this is a real outbound call to MoMo — if
+      // it throws (network error, MoMo 5xx, bad resultCode), the Order+Payment(PENDING) row
+      // already committed above stays as-is with no payUrl ever shown to the customer. Documented
+      // known gap (see docs/architecture.md) rather than a compensating cancellation, which would
+      // reintroduce the same race it's meant to prevent against a concurrent IPN.
+      paymentUrl = await this.momoService.createPayment({ orderNumber: order.orderNumber, amount: total });
+    }
 
     return { order: toOrderView(order), paymentUrl };
   }

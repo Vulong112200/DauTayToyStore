@@ -38,6 +38,16 @@ export const envSchema = z.object({
     .default('https://sandbox.vnpayment.vn/paymentv2/vpcpay.html'),
   VNPAY_RETURN_URL: z.string().optional().default(''),
 
+  MOMO_PARTNER_CODE: z.string().optional().default(''),
+  MOMO_ACCESS_KEY: z.string().optional().default(''),
+  MOMO_SECRET_KEY: z.string().optional().default(''),
+  MOMO_ENDPOINT: z
+    .string()
+    .optional()
+    .default('https://test-payment.momo.vn/v2/gateway/api/create'),
+  MOMO_REDIRECT_URL: z.string().optional().default(''),
+  MOMO_IPN_URL: z.string().optional().default(''),
+
   THROTTLE_TTL_MS: z.coerce.number().int().positive().default(60000),
   THROTTLE_LIMIT: z.coerce.number().int().positive().default(100),
 });

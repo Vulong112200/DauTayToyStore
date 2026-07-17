@@ -152,4 +152,118 @@ describe('PaymentsService', () => {
       }),
     });
   });
+
+  describe('confirmMomoPayment', () => {
+    const momoBaseInput = {
+      orderNumber: 'DTT1',
+      isSuccess: true,
+      resultCode: '0',
+      transactionId: 'MOMO123',
+      amountVnd: 100_000,
+    };
+
+    it('returns order_not_found when the order was paid via VNPay, not MoMo', async () => {
+      prisma.order.findUnique.mockResolvedValue({
+        id: 'o1',
+        status: 'PENDING',
+        payment: { method: 'VNPAY', amount: 100_000 },
+      });
+
+      const outcome = await service.confirmMomoPayment(momoBaseInput);
+
+      expect(outcome).toBe('order_not_found');
+      expect(prisma.payment.updateMany).not.toHaveBeenCalled();
+    });
+
+    it('returns amount_mismatch without mutating Payment/Order when amounts differ', async () => {
+      prisma.order.findUnique.mockResolvedValue({
+        id: 'o1',
+        status: 'PENDING',
+        payment: { method: 'MOMO', amount: 100_000 },
+      });
+
+      const outcome = await service.confirmMomoPayment({ ...momoBaseInput, amountVnd: 90_000 });
+
+      expect(outcome).toBe('amount_mismatch');
+      expect(prisma.payment.updateMany).not.toHaveBeenCalled();
+    });
+
+    it('returns already_processed when the payment row is no longer PENDING', async () => {
+      prisma.order.findUnique.mockResolvedValue({
+        id: 'o1',
+        status: 'CONFIRMED',
+        payment: { method: 'MOMO', amount: 100_000 },
+      });
+      prisma.payment.updateMany.mockResolvedValue({ count: 0 });
+
+      const outcome = await service.confirmMomoPayment(momoBaseInput);
+
+      expect(outcome).toBe('already_processed');
+      expect(prisma.order.updateMany).not.toHaveBeenCalled();
+    });
+
+    it('marks Payment PAID and Order CONFIRMED on a successful callback', async () => {
+      prisma.order.findUnique.mockResolvedValue({
+        id: 'o1',
+        status: 'PENDING',
+        payment: { method: 'MOMO', amount: 100_000 },
+      });
+      prisma.payment.updateMany.mockResolvedValue({ count: 1 });
+      prisma.order.updateMany.mockResolvedValue({ count: 1 });
+
+      const outcome = await service.confirmMomoPayment(momoBaseInput);
+
+      expect(outcome).toBe('ok');
+      expect(prisma.payment.updateMany).toHaveBeenCalledWith({
+        where: { orderId: 'o1', status: 'PENDING' },
+        data: { status: 'PAID', transactionId: 'MOMO123', paidAt: expect.any(Date) },
+      });
+      expect(prisma.orderStatusHistory.create).toHaveBeenCalledWith({
+        data: { orderId: 'o1', status: 'CONFIRMED', note: 'Thanh toán MoMo thành công' },
+      });
+    });
+
+    it('marks Payment FAILED and leaves Order untouched on a declined callback', async () => {
+      prisma.order.findUnique.mockResolvedValue({
+        id: 'o1',
+        status: 'PENDING',
+        payment: { method: 'MOMO', amount: 100_000 },
+      });
+      prisma.payment.updateMany.mockResolvedValue({ count: 1 });
+
+      const outcome = await service.confirmMomoPayment({
+        ...momoBaseInput,
+        isSuccess: false,
+        resultCode: '1006',
+      });
+
+      expect(outcome).toBe('ok');
+      expect(prisma.payment.updateMany).toHaveBeenCalledWith({
+        where: { orderId: 'o1', status: 'PENDING' },
+        data: { status: 'FAILED', transactionId: 'MOMO123', paidAt: undefined },
+      });
+      expect(prisma.order.updateMany).not.toHaveBeenCalled();
+    });
+
+    it('logs a manual-reconciliation history note when payment succeeds after the order already moved on', async () => {
+      prisma.order.findUnique.mockResolvedValue({
+        id: 'o1',
+        status: 'CANCELLED',
+        payment: { method: 'MOMO', amount: 100_000 },
+      });
+      prisma.payment.updateMany.mockResolvedValue({ count: 1 });
+      prisma.order.updateMany.mockResolvedValue({ count: 0 });
+
+      const outcome = await service.confirmMomoPayment(momoBaseInput);
+
+      expect(outcome).toBe('ok');
+      expect(prisma.orderStatusHistory.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          orderId: 'o1',
+          status: 'CANCELLED',
+          note: expect.stringContaining('cần đối soát/hoàn tiền thủ công'),
+        }),
+      });
+    });
+  });
 });

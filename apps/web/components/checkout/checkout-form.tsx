@@ -161,6 +161,10 @@ export function CheckoutForm() {
               <input type="radio" value="VNPAY" {...register('paymentMethod')} />
               Thanh toán qua VNPay (ATM/thẻ nội địa, Visa/Master/JCB, QR)
             </label>
+            <label className="flex items-center gap-2">
+              <input type="radio" value="MOMO" {...register('paymentMethod')} />
+              Thanh toán qua ví MoMo
+            </label>
           </div>
         </div>
 

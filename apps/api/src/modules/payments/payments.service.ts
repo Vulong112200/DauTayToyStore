@@ -2,7 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { OrderStatus, PaymentStatus } from '@prisma/client';
 import { PrismaService } from '../../infra/prisma/prisma.service';
 
-export type VnpayConfirmOutcome =
+export type PaymentConfirmOutcome =
   | 'ok'
   | 'already_processed'
   | 'order_not_found'
@@ -15,24 +15,70 @@ export interface ConfirmVnpayPaymentInput {
   amountVnd: number;
 }
 
+export interface ConfirmMomoPaymentInput {
+  orderNumber: string;
+  isSuccess: boolean;
+  resultCode: string;
+  transactionId: string;
+  amountVnd: number;
+}
+
+interface ConfirmPaymentCoreInput {
+  method: 'VNPAY' | 'MOMO';
+  methodLabel: string;
+  orderNumber: string;
+  isSuccess: boolean;
+  providerCode: string;
+  transactionId: string;
+  amountVnd: number;
+}
+
 @Injectable()
 export class PaymentsService {
   private readonly logger = new Logger(PaymentsService.name);
 
   constructor(private readonly prisma: PrismaService) {}
 
+  /** Thin wrapper: VNPay's own success-code convention (`'00'`) is decided here, not inside the
+   * shared core, so the core never needs to know any gateway's response-code semantics. */
+  async confirmVnpayPayment(input: ConfirmVnpayPaymentInput): Promise<PaymentConfirmOutcome> {
+    return this.confirmPaymentCore({
+      method: 'VNPAY',
+      methodLabel: 'VNPay',
+      orderNumber: input.orderNumber,
+      isSuccess: input.responseCode === '00',
+      providerCode: input.responseCode,
+      transactionId: input.transactionNo,
+      amountVnd: input.amountVnd,
+    });
+  }
+
+  /** Thin wrapper: `isSuccess` is computed by `MomoService` (MoMo's own convention is
+   * `resultCode === 0`) before this is ever called. */
+  async confirmMomoPayment(input: ConfirmMomoPaymentInput): Promise<PaymentConfirmOutcome> {
+    return this.confirmPaymentCore({
+      method: 'MOMO',
+      methodLabel: 'MoMo',
+      orderNumber: input.orderNumber,
+      isSuccess: input.isSuccess,
+      providerCode: input.resultCode,
+      transactionId: input.transactionId,
+      amountVnd: input.amountVnd,
+    });
+  }
+
   /**
-   * Called identically by both the VNPay return-URL and IPN handlers (dual-channel
-   * confirmation), so this must be safe to run twice concurrently for the same order. The
-   * atomicity boundary is the `payment.updateMany({ where: { ..., status: PENDING } })` call
-   * below, not a `findUnique`-then-branch — Postgres re-checks an UPDATE's WHERE clause after
-   * acquiring the row lock, so a second concurrent call's `updateMany` blocks until the first
-   * commits, then sees the row is no longer PENDING and matches zero rows. A prior read-then-
-   * branch design would have let both concurrent calls "win" the race.
+   * Called identically by both callback channels of either gateway (browser return + IPN), so
+   * this must be safe to run twice concurrently for the same order. The atomicity boundary is
+   * the `payment.updateMany({ where: { ..., status: PENDING } })` call below, not a
+   * `findUnique`-then-branch — Postgres re-checks an UPDATE's WHERE clause after acquiring the
+   * row lock, so a second concurrent call's `updateMany` blocks until the first commits, then
+   * sees the row is no longer PENDING and matches zero rows. A prior read-then-branch design
+   * would have let both concurrent calls "win" the race.
    */
-  async confirmVnpayPayment(input: ConfirmVnpayPaymentInput): Promise<VnpayConfirmOutcome> {
-    const { orderNumber, responseCode, transactionNo, amountVnd } = input;
-    const isSuccess = responseCode === '00';
+  private async confirmPaymentCore(input: ConfirmPaymentCoreInput): Promise<PaymentConfirmOutcome> {
+    const { method, methodLabel, orderNumber, isSuccess, providerCode, transactionId, amountVnd } =
+      input;
 
     return this.prisma.$transaction(async (tx) => {
       const order = await tx.order.findUnique({
@@ -40,20 +86,22 @@ export class PaymentsService {
         include: { payment: true },
       });
 
-      if (!order || !order.payment || order.payment.method !== 'VNPAY') {
-        this.logger.warn(`VNPay callback for unknown/non-VNPay order: ${orderNumber}`);
+      if (!order || !order.payment || order.payment.method !== method) {
+        this.logger.warn(
+          `${methodLabel} callback for unknown/non-${methodLabel} order: ${orderNumber}`,
+        );
         return 'order_not_found';
       }
 
       if (order.payment.amount !== amountVnd) {
         this.logger.error(
-          `VNPay amount mismatch for order ${orderNumber}: expected ${order.payment.amount}đ, got ${amountVnd}đ`,
+          `${methodLabel} amount mismatch for order ${orderNumber}: expected ${order.payment.amount}đ, got ${amountVnd}đ`,
         );
         await tx.orderStatusHistory.create({
           data: {
             orderId: order.id,
             status: order.status,
-            note: `VNPay báo số tiền không khớp (nhận ${amountVnd}đ, đơn hàng ${order.payment.amount}đ) — giao dịch bị từ chối`,
+            note: `${methodLabel} báo số tiền không khớp (nhận ${amountVnd}đ, đơn hàng ${order.payment.amount}đ) — giao dịch bị từ chối`,
           },
         });
         return 'amount_mismatch';
@@ -63,7 +111,7 @@ export class PaymentsService {
         where: { orderId: order.id, status: PaymentStatus.PENDING },
         data: {
           status: isSuccess ? PaymentStatus.PAID : PaymentStatus.FAILED,
-          transactionId: transactionNo,
+          transactionId,
           paidAt: isSuccess ? new Date() : undefined,
         },
       });
@@ -78,7 +126,7 @@ export class PaymentsService {
           data: {
             orderId: order.id,
             status: order.status,
-            note: `Thanh toán VNPay thất bại (mã lỗi ${responseCode})`,
+            note: `Thanh toán ${methodLabel} thất bại (mã lỗi ${providerCode})`,
           },
         });
         return 'ok';
@@ -94,7 +142,7 @@ export class PaymentsService {
           data: {
             orderId: order.id,
             status: OrderStatus.CONFIRMED,
-            note: 'Thanh toán VNPay thành công',
+            note: `Thanh toán ${methodLabel} thành công`,
           },
         });
       } else {
@@ -102,13 +150,13 @@ export class PaymentsService {
         // while payment was in flight). No automatic refund is wired up yet — see
         // docs/architecture.md — so this must be loud enough for a human to find and reconcile.
         this.logger.error(
-          `VNPay payment succeeded for order ${orderNumber} but its status is no longer PENDING (now ${order.status}) — needs manual reconciliation/refund`,
+          `${methodLabel} payment succeeded for order ${orderNumber} but its status is no longer PENDING (now ${order.status}) — needs manual reconciliation/refund`,
         );
         await tx.orderStatusHistory.create({
           data: {
             orderId: order.id,
             status: order.status,
-            note: 'Nhận thanh toán VNPay thành công sau khi đơn đã đổi trạng thái — cần đối soát/hoàn tiền thủ công',
+            note: `Nhận thanh toán ${methodLabel} thành công sau khi đơn đã đổi trạng thái — cần đối soát/hoàn tiền thủ công`,
           },
         });
       }

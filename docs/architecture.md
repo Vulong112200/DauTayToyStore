@@ -355,12 +355,13 @@ with 50 units in the warehouse but only 1 flash-sale slot remaining, the cart co
 ## Phase 4+ — VNPay payment gateway (sandbox)
 
 The first real payment gateway, replacing checkout's previous COD-only hardcoding. Scoped to
-VNPay only (MoMo/Stripe enum values already exist in `Payment.method` but remain unused); no
-Prisma migration was needed — `PaymentMethod.VNPAY`, `PaymentStatus`, and `Payment.transactionId`/
-`paidAt` had already been modeled ahead of time. `checkoutSchema` gained an additive
-`paymentMethod: z.enum(['COD','VNPAY']).default('COD')` field, so any existing caller that omits
-it keeps today's COD behavior unchanged; the checkout endpoint's response grew from a bare
-`OrderView` to `{ order, paymentUrl }` (`paymentUrl` is `null` for COD).
+VNPay only at first (Stripe's enum value already exists in `Payment.method` but remains unused;
+MoMo followed shortly after — see the next section); no Prisma migration was needed —
+`PaymentMethod.VNPAY`, `PaymentStatus`, and `Payment.transactionId`/`paidAt` had already been
+modeled ahead of time. `checkoutSchema` gained an additive `paymentMethod` field (originally
+`z.enum(['COD','VNPAY']).default('COD')`, later widened to include `'MOMO'`), so any existing
+caller that omits it keeps today's COD behavior unchanged; the checkout endpoint's response grew
+from a bare `OrderView` to `{ order, paymentUrl }` (`paymentUrl` is `null` for COD).
 
 ### Atomic compare-and-swap idempotency, not read-then-branch
 
@@ -407,7 +408,7 @@ Vietnam's clock specifically.
 
 ### Explicitly out of scope this pass
 
-- **MoMo, Stripe** — enum values reserved, not implemented.
+- **Stripe** — enum value reserved, not implemented.
 - **Admin UI to view/refund payments** — not built; the `OrderStatusHistory` notes above are
   today's only surface for staff to notice a payment needs manual attention.
 - **Automatic VNPay refund API call when an order is later CANCELLED** — admin refunds manually
@@ -420,6 +421,97 @@ Vietnam's clock specifically.
 - **VNPay merchant dashboard IPN registration** — `VNPAY_RETURN_URL` is an env var this app reads,
   but the IPN URL (`<API public URL>/api/payments/vnpay/ipn`) must additionally be registered once
   inside the VNPay merchant portal itself; no env var/code path can do this.
+
+## Phase 4+ — MoMo payment gateway (sandbox), the second gateway
+
+Adds MoMo alongside VNPay as a second `paymentMethod` option (`checkoutSchema.paymentMethod` now
+`z.enum(['COD','VNPAY','MOMO'])`). Confirmed against MoMo's official docs (developers.momo.vn,
+fetched live rather than assumed from memory) that MoMo's API shape differs from VNPay in three
+structural ways, each of which shaped the implementation below.
+
+### Extraction, not folding: `confirmPaymentCore` as a private, byte-for-byte-preserved helper
+
+VNPay's `confirmVnpayPayment` was already shipped and working before MoMo existed. Rather than
+generalizing that function in place for MoMo's sake (risking a shared-code bug silently changing
+VNPay's already-correct behavior), its transaction body was extracted **unchanged** into a private
+`confirmPaymentCore({ method, methodLabel, orderNumber, isSuccess, providerCode, transactionId,
+amountVnd })`, with `confirmVnpayPayment`/`confirmMomoPayment` as thin public wrappers that each
+compute `isSuccess` using their own gateway's convention (VNPay: `responseCode === '00'`; MoMo:
+`resultCode === 0`) *before* calling in — the shared core never branches on a response-code string
+itself, so it can never accidentally learn the wrong gateway's success convention. The extraction
+was verified as a standalone step: all 7 pre-existing VNPay tests in `payments.service.spec.ts`
+pass unchanged before any MoMo-specific test was added, isolating "did the refactor break VNPay"
+from "does MoMo work" as two separate, separately-verified questions.
+
+### MoMo requires a real outbound API call during checkout — VNPay doesn't
+
+VNPay's redirect URL is constructed and signed entirely locally; MoMo instead requires a
+server-to-server `POST https://test-payment.momo.vn/v2/gateway/api/create` call to obtain a
+`payUrl` to redirect to (`MomoService.createPayment()`). This is a new failure mode `orders.service.ts
+checkout()` didn't have before: if this call throws (network error, MoMo 5xx, a non-zero
+`resultCode`) *after* the Order+Payment(PENDING, MOMO) row already committed in the same
+transaction as inventory reservation, the checkout HTTP call fails but the Order persists, PENDING,
+with no `payUrl` ever shown to the customer. A "compensating cancellation" (auto-cancel the order
+on this failure) was considered and rejected: it reintroduces the identical race it's meant to
+solve (MoMo's IPN could confirm success while the compensating cancellation is mid-flight,
+producing the exact same "payment succeeded after order moved on" state `confirmPaymentCore`
+already handles) while adding real complexity, for a failure mode that's sandbox-only today. This
+is a documented known gap, not silently ignored — `AdminOrdersService.updateStatus`'s existing
+PENDING→CANCELLED path already lets an admin manually clean up a stray order if one accumulates;
+no automatic stale-order sweep exists (not built unless this proves to matter at real volume).
+
+### MoMo's IPN is POST JSON acknowledged with a bare 204 — VNPay's is GET acknowledged with JSON
+
+VNPay's IPN is a GET with query-string params, acknowledged with `{RspCode, Message}` JSON. MoMo's
+IPN (`POST /payments/momo/ipn`) is the opposite on both axes: a POST with a real JSON body (numeric
+fields like `amount`/`resultCode`/`responseTime` arrive as actual JS numbers, not strings), and
+MoMo requires a bare HTTP 204 No Content within 15 seconds — no response body at all. Confirmed no
+global interceptor in `app.module.ts` (`LoggingInterceptor`/`AuditLogInterceptor`, both `tap`-only
+observers) transforms response bodies, so `@HttpCode(204)` returning nothing reaches MoMo as a
+true empty response. MoMo's browser-return redirect (`GET /payments/momo/return`), by contrast,
+*does* carry the same field set as the IPN, just as GET query strings — so both handlers share one
+`MomoService.parseAndVerifyCallback()`, with each controller method normalizing its own source
+type (JSON number vs query string) to the plain-decimal-string form the signature needs *before*
+calling in, rather than doing that coercion inside the pure signing/verification util.
+
+### Signature scheme: fixed named field lists, HMAC-SHA256 — not VNPay's generic sorted signer
+
+VNPay's signer takes "whatever `vnp_*` params are present" and sorts them. MoMo instead signs a
+specific, explicitly-named field subset in a fixed order — one list for the create-payment
+request, a *different* list for IPN/redirect verification — so `common/utils/momo.util.ts` has two
+separate builders (`buildMomoRequestSignature`, `buildMomoCallbackSignature`) rather than one
+generic function. Also unlike VNPay's `+`-for-space encoding quirk, MoMo signs plain JSON string
+values with no URL-encoding transform at all — a unit test asserts this explicitly since it's the
+one place familiarity with the VNPay code could tempt a reflexive (and wrong) re-application of
+`encodeVnpayValue`-style encoding. Amounts are plain VND (no ×100 multiplication like VNPay), but
+bounded both ways — 1,000 to 50,000,000 VND — unlike VNPay's ceiling-only check.
+
+### `requestId`/`orderId` both reused as `orderNumber` — a sharper landmine than VNPay's equivalent
+
+VNPay's `vnp_TxnRef` is its only dedup identity, reused safely as `orderNumber` since no retry flow
+exists. MoMo has two independent identity axes — `orderId` (business reference) and `requestId`
+(MoMo's own request-dedup key) — both currently set to `orderNumber` in `MomoService.createPayment()`.
+Flagged with an explicit code `TODO(retry-payment)` comment (not just prose, so it survives a
+future refactor): a retry-payment flow must mint a fresh `requestId` per attempt, or MoMo will
+dedupe the retry against the original request instead of treating it as new.
+
+### No merchant-dashboard IPN registration step for MoMo — but that cuts both ways
+
+VNPay's IPN URL is registered once, out-of-band, in VNPay's own merchant dashboard. MoMo's
+`ipnUrl` instead travels as a field on every create-payment request (`MOMO_IPN_URL` env var),
+which means no separate dashboard step is needed to deploy — but also means MoMo has nothing to
+reject at request time if that URL is unreachable or has a typo; the failure is invisible until
+MoMo's own delivery attempt silently fails. Documented in `.env.example`/`docs/deployment.md`:
+verify `MOMO_IPN_URL` is a publicly reachable, TLS-valid host before the first real sandbox
+transaction — there's no dashboard toggle that would otherwise catch a misconfiguration.
+
+### Out of scope this pass (same posture as VNPay's own out-of-scope list)
+
+- Stripe — enum value reserved, not implemented.
+- Admin UI to view/refund payments, and automatic MoMo refund-API calls on order cancellation —
+  same manual-merchant-portal posture as VNPay.
+- A retry-payment flow for a failed MoMo payment (see the `requestId`/`orderId` note above).
+- The network-call-failure known gap described above (documented, not auto-recovered).
 
 ## Phase 3 — Remaining marketing entities (GiftVoucher, ComboDeal, BuyXGetYRule, FreeShippingRule)
 

@@ -32,6 +32,14 @@ Kiểm tra bạn đã có sẵn (nếu chưa, xem `docs/architecture.md` phần 
   COD checkout không bị ảnh hưởng — chỉ riêng việc chọn VNPay lúc checkout sẽ báo lỗi rõ ràng.
   Sau khi có credentials, còn cần đăng ký thêm URL IPN (`<API public URL>/api/payments/vnpay/ipn`)
   trong dashboard merchant của VNPay — bước này không thể làm qua biến môi trường
+- [ ] MoMo merchant credentials (tuỳ chọn — nếu muốn checkout bằng MoMo hoạt động thật) — MoMo
+  **không** công khai sẵn tài khoản test dùng chung như một số cổng khác, phải đăng ký riêng tại
+  [business.momo.vn](https://business.momo.vn) hoặc email `merchant.care@momo.vn` để lấy
+  `MOMO_PARTNER_CODE`/`MOMO_ACCESS_KEY`/`MOMO_SECRET_KEY`. Khác với VNPay, `MOMO_IPN_URL` gửi kèm
+  mỗi request chứ không đăng ký riêng trên dashboard — tiện hơn khi deploy, nhưng cũng có nghĩa
+  MoMo không báo lỗi ngay nếu URL sai/không truy cập được (chỉ lặng lẽ gửi IPN thất bại), nên cần
+  double-check `MOMO_IPN_URL` là domain public, có TLS hợp lệ, trước giao dịch sandbox đầu tiên.
+  Để trống vẫn deploy được bình thường, COD/VNPay không bị ảnh hưởng.
 - [ ] Google OAuth Client ID/Secret (nếu dùng đăng nhập Google) — từ Google Cloud Console
 - [ ] 2 chuỗi bí mật JWT ngẫu nhiên, tối thiểu 32 ký tự mỗi chuỗi (`JWT_ACCESS_SECRET`, `JWT_REFRESH_SECRET`). Tạo nhanh:
   ```bash
@@ -116,6 +124,15 @@ VNPAY_TMN_CODE=<TMN code lấy từ sandbox.vnpayment.vn/devreg>
 VNPAY_HASH_SECRET=<hash secret lấy từ sandbox.vnpayment.vn/devreg>
 VNPAY_PAYMENT_URL=https://sandbox.vnpayment.vn/paymentv2/vpcpay.html
 VNPAY_RETURN_URL=https://dautaytoy-api.onrender.com/api/payments/vnpay/return
+
+# MoMo payment gateway — tuỳ chọn, để trống thì COD/VNPay checkout vẫn chạy bình thường,
+# chỉ riêng việc chọn MoMo lúc checkout sẽ báo lỗi rõ ràng thay vì gửi thất bại âm thầm
+MOMO_PARTNER_CODE=<partnerCode lấy từ business.momo.vn hoặc merchant.care@momo.vn>
+MOMO_ACCESS_KEY=<accessKey tương ứng>
+MOMO_SECRET_KEY=<secretKey tương ứng>
+MOMO_ENDPOINT=https://test-payment.momo.vn/v2/gateway/api/create
+MOMO_REDIRECT_URL=https://dautaytoy-api.onrender.com/api/payments/momo/return
+MOMO_IPN_URL=https://dautaytoy-api.onrender.com/api/payments/momo/ipn
 
 # Rate limiting (tuỳ chọn, có default hợp lý)
 THROTTLE_TTL_MS=60000

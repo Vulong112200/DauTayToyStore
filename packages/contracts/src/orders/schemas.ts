@@ -11,7 +11,7 @@ export const orderStatusSchema = z.enum([
 ]);
 export type OrderStatus = z.infer<typeof orderStatusSchema>;
 
-export const paymentMethodSchema = z.enum(['COD', 'VNPAY']);
+export const paymentMethodSchema = z.enum(['COD', 'VNPAY', 'MOMO']);
 export type PaymentMethod = z.infer<typeof paymentMethodSchema>;
 
 export const checkoutSchema = z.object({
