@@ -255,7 +255,7 @@ Trong màn hình cấu hình project (hoặc sau đó ở **Project Settings →
 Vào **Project Settings → Environment Variables**, thêm (áp dụng cho cả Production/Preview/Development tuỳ nhu cầu):
 
 ```bash
-NEXT_PUBLIC_API_URL=https://dautaytoystore.onrender.com/api
+NEXT_PUBLIC_API_URL=https://dautaytoy-api.onrender.com/api
 NEXT_PUBLIC_SITE_URL=https://your-app.vercel.app
 NEXT_PUBLIC_GOOGLE_CLIENT_ID=<google client id, để trống nếu chưa dùng>
 ```
@@ -263,6 +263,16 @@ NEXT_PUBLIC_GOOGLE_CLIENT_ID=<google client id, để trống nếu chưa dùng>
 > **Đây là biến build-time** (Next.js inline `NEXT_PUBLIC_*` vào bundle lúc build, không đọc lại
 > lúc runtime) — phải set **trước khi bấm Deploy lần đầu**, và **redeploy lại** (Deployments →
 > nút "..." → Redeploy) mỗi khi bạn đổi giá trị các biến này sau này.
+
+> **⚠️ `NEXT_PUBLIC_API_URL` là nguyên nhân số 1 gây lỗi "cả dashboard bấm đâu cũng 404" trên bản
+> deploy.** Giá trị PHẢI là URL public của service API trên Render (đúng host — trùng với
+> `dautaytoy-api.onrender.com` dùng xuyên suốt tài liệu này, KHÔNG phải một host khác) và **bắt
+> buộc kết thúc bằng `/api`** (không có dấu `/` thừa ở cuối). Nếu để trống, sai host, hoặc thiếu
+> `/api`, thì bundle deploy sẽ fallback về `http://localhost:4000/api` (hoặc trỏ sai) và **mọi**
+> lời gọi API từ trình duyệt — kể cả toàn bộ trang admin — đều thất bại/404. Kiểm tra nhanh: mở
+> site Vercel → DevTools → Network → xem request `/api/...` có trỏ đúng domain Render không; nếu
+> thấy trỏ `localhost` nghĩa là biến chưa được set (nhớ **Redeploy** sau khi set). Bản build phía
+> web cũng in một cảnh báo đỏ ở Console khi phát hiện tình huống này.
 
 ### 2.4. Deploy
 

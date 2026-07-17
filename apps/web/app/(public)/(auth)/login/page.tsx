@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { Suspense } from 'react';
 import { AuthCard } from '@/components/auth/auth-card';
 import { LoginForm } from './login-form';
 
@@ -14,7 +15,11 @@ export default function LoginPage() {
       description="Đăng nhập để tiếp tục mua sắm tại DauTayToy Store"
       footer={{ question: 'Chưa có tài khoản?', linkLabel: 'Đăng ký ngay', href: '/register' }}
     >
-      <LoginForm />
+      {/* useSearchParams() inside LoginForm (to read ?redirect) requires a Suspense
+          boundary, or `next build` bails the whole route out of static prerendering. */}
+      <Suspense fallback={<p className="text-center text-muted-foreground">Đang tải...</p>}>
+        <LoginForm />
+      </Suspense>
     </AuthCard>
   );
 }

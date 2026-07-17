@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { useRouter } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { Heart } from 'lucide-react';
 import type { ProductListItem } from '@repo/contracts';
 import { useAuthStore } from '@/store/auth-store';
@@ -16,6 +16,7 @@ function WishlistButtonImpl({
   className?: string;
 }) {
   const router = useRouter();
+  const pathname = usePathname();
   const user = useAuthStore((state) => state.user);
   const { data: isInWishlist = false } = useIsInWishlist(product.id, !!user);
   const addToWishlist = useAddToWishlist();
@@ -30,7 +31,9 @@ function WishlistButtonImpl({
     event.stopPropagation();
 
     if (!user) {
-      router.push('/login');
+      // Send the guest to login, then back to the page they were on so the heart
+      // click isn't lost (they'd otherwise land on the homepage after logging in).
+      router.push(`/login?redirect=${encodeURIComponent(pathname)}`);
       return;
     }
 

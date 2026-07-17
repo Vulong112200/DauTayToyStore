@@ -36,7 +36,7 @@ export function HeroSection() {
               </Link>
             </Button>
             <Button size="lg" variant="outline" asChild>
-              <Link href="/flash-sales">Xem Flash Sale</Link>
+              <Link href="/products">Xem sản phẩm nổi bật</Link>
             </Button>
           </div>
         </motion.div>

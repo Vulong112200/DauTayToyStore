@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import Link from 'next/link';
 
 export const metadata: Metadata = {
   title: 'Chính sách bảo mật',
@@ -53,7 +54,7 @@ export default function PrivacyPolicyPage() {
           <p>
             Bạn có quyền yêu cầu xem, chỉnh sửa hoặc xoá thông tin cá nhân của mình bất kỳ lúc nào
             bằng cách liên hệ với chúng tôi qua trang{' '}
-            <a href="/contact">Liên hệ</a>.
+            <Link href="/contact">Liên hệ</Link>.
           </p>
 
           <h2>6. Thay đổi chính sách</h2>

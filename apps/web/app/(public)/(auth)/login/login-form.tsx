@@ -1,7 +1,8 @@
 'use client';
 
 import * as React from 'react';
-import { useRouter } from 'next/navigation';
+import Link from 'next/link';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useQueryClient } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
@@ -17,8 +18,19 @@ import { ApiError } from '@/lib/api-client';
 import { authApi } from '@/lib/api/auth';
 import { useAuthStore } from '@/store/auth-store';
 
+/** Only honor same-origin, path-relative redirects — never an absolute URL or a
+ * protocol-relative "//evil.com" — so the ?redirect param can't be used for an
+ * open redirect off-site after login. */
+function safeRedirect(target: string | null): string {
+  if (target && target.startsWith('/') && !target.startsWith('//')) {
+    return target;
+  }
+  return '/';
+}
+
 export function LoginForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const queryClient = useQueryClient();
   const setSession = useAuthStore((state) => state.setSession);
   const [serverError, setServerError] = React.useState<string | null>(null);
@@ -44,7 +56,7 @@ export function LoginForm() {
         queryClient.invalidateQueries({ queryKey: CART_QUERY_KEY }),
         queryClient.invalidateQueries({ queryKey: WISHLIST_QUERY_KEY }),
       ]);
-      router.push('/');
+      router.push(safeRedirect(searchParams.get('redirect')));
       router.refresh();
     } catch (error) {
       setServerError(error instanceof ApiError ? error.message : 'Đăng nhập thất bại');
@@ -73,9 +85,12 @@ export function LoginForm() {
       <div className="space-y-1.5">
         <div className="flex items-center justify-between">
           <Label htmlFor="password">Mật khẩu</Label>
-          <a href="/forgot-password" className="text-xs font-medium text-primary hover:underline">
+          <Link
+            href="/forgot-password"
+            className="text-xs font-medium text-primary hover:underline"
+          >
             Quên mật khẩu?
-          </a>
+          </Link>
         </div>
         <PasswordInput
           id="password"
