@@ -1,5 +1,7 @@
 'use client';
 
+import Link from 'next/link';
+import { Zap } from 'lucide-react';
 import { useAdminDashboard } from '@/hooks/use-admin-dashboard';
 import { ORDER_STATUS_LABELS } from '@/lib/order-status';
 import { formatVnd } from '@/lib/utils';
@@ -21,6 +23,29 @@ export default function AdminDashboardPage() {
   return (
     <div className="space-y-8">
       <h1 className="font-display text-2xl font-bold">Tổng quan</h1>
+
+      {data.activeFlashSales.length > 0 && (
+        <Link
+          href="/admin/flash-sales"
+          className="block rounded-2xl border border-primary/30 bg-primary/10 p-5 transition-colors hover:bg-primary/15"
+        >
+          <div className="flex items-center gap-2 font-display font-bold text-primary">
+            <Zap className="h-5 w-5 fill-primary" />
+            Đang có {data.activeFlashSales.length} đợt flash sale diễn ra
+          </div>
+          <ul className="mt-2 space-y-1 text-sm text-foreground/80">
+            {data.activeFlashSales.map((flashSale) => (
+              <li key={flashSale.id} className="flex flex-wrap items-center gap-x-2">
+                <span className="font-medium">{flashSale.name}</span>
+                <span className="text-muted-foreground">
+                  · {flashSale.itemCount} sản phẩm · kết thúc{' '}
+                  {new Date(flashSale.endsAt).toLocaleString('vi-VN')}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </Link>
+      )}
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {stats.map((stat) => (

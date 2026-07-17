@@ -50,9 +50,10 @@ describe('FlashSalesService (public)', () => {
       makeSale([makeItem({ stockLimit: 10, soldCount: 10 })]),
     ]);
 
-    const [sale] = await service.findActive();
+    const sales = await service.findActive();
 
-    expect(sale.items[0]).toEqual({
+    expect(sales).toHaveLength(1);
+    expect(sales[0]!.items[0]).toEqual({
       productId: 'p1',
       slug: 'lego-city',
       name: 'LEGO City',
@@ -85,9 +86,9 @@ describe('FlashSalesService (public)', () => {
       ]),
     ]);
 
-    const [sale] = await service.findActive();
+    const item = (await service.findActive())[0]!.items[0]!;
 
-    expect(sale.items[0].soldOut).toBe(false);
-    expect(sale.items[0].primaryImageUrl).toBeNull();
+    expect(item.soldOut).toBe(false);
+    expect(item.primaryImageUrl).toBeNull();
   });
 });

@@ -202,12 +202,21 @@ export const dashboardRecentOrderSchema = z.object({
 });
 export type DashboardRecentOrder = z.infer<typeof dashboardRecentOrderSchema>;
 
+export const dashboardActiveFlashSaleSchema = z.object({
+  id: z.string().uuid(),
+  name: z.string(),
+  endsAt: z.string().datetime(),
+  itemCount: z.number().int(),
+});
+export type DashboardActiveFlashSale = z.infer<typeof dashboardActiveFlashSaleSchema>;
+
 export const dashboardSummarySchema = z.object({
   totalProducts: z.number().int(),
   totalOrders: z.number().int(),
   totalRevenue: z.number().int(),
   totalCustomers: z.number().int(),
   recentOrders: z.array(dashboardRecentOrderSchema),
+  activeFlashSales: z.array(dashboardActiveFlashSaleSchema),
 });
 export type DashboardSummary = z.infer<typeof dashboardSummarySchema>;
 

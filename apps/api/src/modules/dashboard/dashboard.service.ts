@@ -9,7 +9,8 @@ export class DashboardService {
   constructor(private readonly prisma: PrismaService) {}
 
   async getSummary(): Promise<DashboardSummary> {
-    const [totalProducts, totalOrders, totalCustomers, revenueAgg, recentOrders] =
+    const now = new Date();
+    const [totalProducts, totalOrders, totalCustomers, revenueAgg, recentOrders, activeFlashSales] =
       await Promise.all([
         this.prisma.product.count({ where: { status: { not: 'ARCHIVED' } } }),
         this.prisma.order.count(),
@@ -29,6 +30,14 @@ export class DashboardService {
             createdAt: true,
           },
         }),
+        // Flash sales running right now — same active-window rule as the public
+        // /flash-sales endpoint and the promotion engine — so the admin sees at a
+        // glance whether a sale is live.
+        this.prisma.flashSale.findMany({
+          where: { isActive: true, startsAt: { lte: now }, endsAt: { gte: now } },
+          orderBy: { endsAt: 'asc' },
+          select: { id: true, name: true, endsAt: true, _count: { select: { items: true } } },
+        }),
       ]);
 
     return {
@@ -42,6 +51,12 @@ export class DashboardService {
         status: order.status,
         total: order.total,
         createdAt: order.createdAt.toISOString(),
+      })),
+      activeFlashSales: activeFlashSales.map((flashSale) => ({
+        id: flashSale.id,
+        name: flashSale.name,
+        endsAt: flashSale.endsAt.toISOString(),
+        itemCount: flashSale._count.items,
       })),
     };
   }

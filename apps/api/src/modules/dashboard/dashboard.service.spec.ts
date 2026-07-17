@@ -7,6 +7,7 @@ describe('DashboardService', () => {
     product: { count: jest.Mock };
     order: { count: jest.Mock; aggregate: jest.Mock; findMany: jest.Mock };
     user: { count: jest.Mock };
+    flashSale: { findMany: jest.Mock };
   };
 
   beforeEach(() => {
@@ -14,6 +15,7 @@ describe('DashboardService', () => {
       product: { count: jest.fn() },
       order: { count: jest.fn(), aggregate: jest.fn(), findMany: jest.fn() },
       user: { count: jest.fn() },
+      flashSale: { findMany: jest.fn() },
     };
     service = new DashboardService(prisma as unknown as PrismaService);
   });
@@ -32,6 +34,9 @@ describe('DashboardService', () => {
         createdAt: new Date('2026-01-01'),
       },
     ]);
+    prisma.flashSale.findMany.mockResolvedValue([
+      { id: 'fs1', name: 'Flash sale hè', endsAt: new Date('2026-07-20'), _count: { items: 3 } },
+    ]);
 
     const result = await service.getSummary();
 
@@ -49,6 +54,9 @@ describe('DashboardService', () => {
           createdAt: '2026-01-01T00:00:00.000Z',
         },
       ],
+      activeFlashSales: [
+        { id: 'fs1', name: 'Flash sale hè', endsAt: '2026-07-20T00:00:00.000Z', itemCount: 3 },
+      ],
     });
     expect(prisma.user.count).toHaveBeenCalledWith({
       where: { roles: { some: { role: { name: 'CUSTOMER' } } } },
@@ -61,6 +69,7 @@ describe('DashboardService', () => {
     prisma.user.count.mockResolvedValue(0);
     prisma.order.aggregate.mockResolvedValue({ _sum: { total: null } });
     prisma.order.findMany.mockResolvedValue([]);
+    prisma.flashSale.findMany.mockResolvedValue([]);
 
     const result = await service.getSummary();
 
