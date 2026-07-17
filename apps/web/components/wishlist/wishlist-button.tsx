@@ -3,15 +3,16 @@
 import * as React from 'react';
 import { useRouter } from 'next/navigation';
 import { Heart } from 'lucide-react';
+import type { ProductListItem } from '@repo/contracts';
 import { useAuthStore } from '@/store/auth-store';
 import { useAddToWishlist, useRemoveFromWishlist, useWishlist } from '@/hooks/use-wishlist';
 import { cn } from '@/lib/utils';
 
 export function WishlistButton({
-  productId,
+  product,
   className,
 }: {
-  productId: string;
+  product: ProductListItem;
   className?: string;
 }) {
   const router = useRouter();
@@ -20,7 +21,10 @@ export function WishlistButton({
   const addToWishlist = useAddToWishlist();
   const removeFromWishlist = useRemoveFromWishlist();
 
-  const isInWishlist = wishlist?.items.some((item) => item.productId === productId) ?? false;
+  const isInWishlist = wishlist?.items.some((item) => item.productId === product.id) ?? false;
+  // Guard against rapid double-clicks racing two mutations to out-of-order
+  // resolution — but note the heart itself already reflects the change
+  // optimistically, so this disable is invisible, not the old "frozen" feel.
   const isPending = addToWishlist.isPending || removeFromWishlist.isPending;
 
   function handleClick(event: React.MouseEvent) {
@@ -33,9 +37,9 @@ export function WishlistButton({
     }
 
     if (isInWishlist) {
-      removeFromWishlist.mutate(productId);
+      removeFromWishlist.mutate(product.id);
     } else {
-      addToWishlist.mutate({ productId });
+      addToWishlist.mutate({ productId: product.id, product });
     }
   }
 
@@ -48,7 +52,7 @@ export function WishlistButton({
       title={isInWishlist ? 'Xoá khỏi danh sách yêu thích' : 'Thêm vào danh sách yêu thích'}
       aria-pressed={isInWishlist}
       className={cn(
-        'flex h-9 w-9 items-center justify-center rounded-full bg-background/90 shadow-sm transition-colors hover:bg-background disabled:opacity-50',
+        'flex h-9 w-9 items-center justify-center rounded-full bg-background/90 shadow-sm transition-colors hover:bg-background',
         className,
       )}
     >

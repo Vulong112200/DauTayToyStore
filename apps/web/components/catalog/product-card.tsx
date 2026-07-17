@@ -31,7 +31,7 @@ export function ProductCard({ product }: { product: ProductListItem }) {
             Hết hàng
           </span>
         )}
-        <WishlistButton productId={product.id} className="absolute right-2 top-2" />
+        <WishlistButton product={product} className="absolute right-2 top-2" />
       </Link>
       <CardContent className="flex flex-1 flex-col gap-2 p-4">
         {product.brandName && (

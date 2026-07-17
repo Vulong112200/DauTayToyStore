@@ -161,7 +161,24 @@ export default async function ProductDetailPage({ params }: PageProps) {
 
           <div className="flex items-center gap-3">
             <AddToCartButton productId={product.id} inStock={product.inStock} />
-            <WishlistButton productId={product.id} className="static shadow-none border border-input" />
+            <WishlistButton
+              product={{
+                id: product.id,
+                slug: product.slug,
+                name: product.name,
+                price: product.price,
+                compareAtPrice: product.compareAtPrice,
+                avgRating: product.avgRating,
+                reviewCount: product.reviewCount,
+                primaryImageUrl:
+                  product.images.find((image) => image.isPrimary)?.url ??
+                  product.images[0]?.url ??
+                  null,
+                brandName: product.brand?.name ?? null,
+                inStock: product.inStock,
+              }}
+              className="static shadow-none border border-input"
+            />
           </div>
         </div>
       </div>

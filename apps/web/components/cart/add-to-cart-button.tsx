@@ -20,11 +20,13 @@ export function AddToCartButton({
 
   async function handleAdd() {
     setError(null);
-    setSuccess(false);
+    // Show success immediately (the header badge also bumps optimistically) so
+    // the click feels instant; roll it back if the request actually fails.
+    setSuccess(true);
     try {
       await addToCart.mutateAsync({ productId, quantity });
-      setSuccess(true);
     } catch (err) {
+      setSuccess(false);
       setError(err instanceof ApiError ? err.message : 'Không thể thêm vào giỏ hàng');
     }
   }

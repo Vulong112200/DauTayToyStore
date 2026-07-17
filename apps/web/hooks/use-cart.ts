@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type {
   AddCartItemInput,
   ApplyCartCouponInput,
+  CartView,
   RedeemGiftVoucherInput,
   UpdateCartItemInput,
 } from '@repo/contracts';
@@ -19,6 +20,25 @@ export function useAddToCart() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (input: AddCartItemInput) => cartApi.addItem(input),
+    // Optimistically bump only the header badge count so it reacts instantly,
+    // without faking the server-computed line items / promotions / totals (which
+    // stay authoritative and are replaced wholesale by onSuccess). The full cart
+    // page isn't mounted while adding from a product page, so the count is the
+    // only visible surface until the real response arrives.
+    onMutate: async (input) => {
+      await queryClient.cancelQueries({ queryKey: CART_QUERY_KEY });
+      const previous = queryClient.getQueryData<CartView>(CART_QUERY_KEY);
+      if (previous) {
+        queryClient.setQueryData<CartView>(CART_QUERY_KEY, {
+          ...previous,
+          itemCount: previous.itemCount + (input.quantity ?? 1),
+        });
+      }
+      return { previous };
+    },
+    onError: (_error, _variables, context) => {
+      if (context?.previous) queryClient.setQueryData(CART_QUERY_KEY, context.previous);
+    },
     onSuccess: (data) => queryClient.setQueryData(CART_QUERY_KEY, data),
   });
 }
