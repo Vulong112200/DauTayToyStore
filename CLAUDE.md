@@ -218,8 +218,9 @@ integer math — no cents/decimal handling anywhere. Frontend formats via
   through Resend (`infra/email/resend-email.service.ts`) instead of only logging, but only once
   those two env vars are set; until then, sends are skipped with a logged warning rather than
   failing the job (see the Background jobs paragraph above).
-- **Change the seeded admin password** (`admin@dautaytoystore.vn` / `Admin@123456`) before
-  seeding any shared/production environment.
+- ~~Change the seeded admin password~~ — done: the `admin@dautaytoystore.vn` account's password
+  on the shared Supabase DB has been rotated off the seeded default. New password was generated
+  and handed to the project owner directly, not stored in this repo.
 - **Register a VNPay sandbox merchant account and set `VNPAY_TMN_CODE`/`VNPAY_HASH_SECRET`/
   `VNPAY_RETURN_URL` on the Render deploy** (register at sandbox.vnpayment.vn/devreg — see
   `docs/deployment.md`), then separately register the IPN URL
