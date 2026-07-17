@@ -9,6 +9,19 @@ const slugSchema = z
   .max(200)
   .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, 'Slug chỉ gồm chữ thường, số và dấu gạch ngang');
 
+// Admin image/link fields hold either a pasted absolute URL (https://…) or a
+// root-relative path (/demo/…) — the latter is what seed data stores when R2
+// isn't configured, and what an admin may legitimately type. A bare
+// z.string().url() rejects the relative form (and any stray surrounding
+// whitespace), which silently blocks the *entire* form from saving client-side.
+// Trim first, then accept an absolute URL or a root-relative path.
+const imageUrlSchema = z
+  .string()
+  .trim()
+  .refine((value) => value.startsWith('/') || z.string().url().safeParse(value).success, {
+    message: 'URL ảnh không hợp lệ',
+  });
+
 export const productStatusSchema = z.enum(['DRAFT', 'PUBLISHED', 'ARCHIVED']);
 export type ProductStatus = z.infer<typeof productStatusSchema>;
 
@@ -40,7 +53,7 @@ export type AdminProductQuery = z.infer<typeof adminProductQuerySchema>;
 
 export const productImageInputSchema = z.object({
   id: z.string().uuid().optional(),
-  url: z.string().url('URL hình ảnh không hợp lệ'),
+  url: imageUrlSchema,
   altText: z.string().optional(),
   isPrimary: z.boolean().default(false),
   sortOrder: z.number().int().default(0),
@@ -129,7 +142,7 @@ export const categoryInputSchema = z.object({
   name: z.string().min(2, 'Tên danh mục quá ngắn').max(100),
   slug: slugSchema,
   description: z.string().optional(),
-  imageUrl: z.string().url().optional(),
+  imageUrl: imageUrlSchema.optional(),
   sortOrder: z.number().int().default(0),
   isActive: z.boolean().default(true),
   metaTitle: z.string().optional(),
@@ -158,7 +171,7 @@ export type AdminCategory = z.infer<typeof adminCategorySchema>;
 export const brandInputSchema = z.object({
   name: z.string().min(2, 'Tên thương hiệu quá ngắn').max(100),
   slug: slugSchema,
-  logoUrl: z.string().url().optional(),
+  logoUrl: imageUrlSchema.optional(),
   description: z.string().optional(),
   originCountry: z.string().optional(),
   isActive: z.boolean().default(true),
@@ -333,7 +346,7 @@ export const blogPostInputSchema = z.object({
   slug: slugSchema,
   excerpt: z.string().max(300).optional(),
   content: z.string().min(1, 'Nội dung không được để trống'),
-  coverImageUrl: z.string().url('URL ảnh không hợp lệ').optional(),
+  coverImageUrl: imageUrlSchema.optional(),
   categoryId: z.string().uuid().optional(),
   status: blogStatusSchema.default('DRAFT'),
   metaTitle: z.string().max(160).optional(),
@@ -389,7 +402,7 @@ export type BannerPosition = z.infer<typeof bannerPositionSchema>;
 
 export const bannerInputSchema = z.object({
   title: z.string().min(2, 'Tiêu đề quá ngắn').max(150),
-  imageUrl: z.string().url('URL ảnh không hợp lệ'),
+  imageUrl: imageUrlSchema,
   linkUrl: z.string().url('URL liên kết không hợp lệ').optional(),
   position: bannerPositionSchema,
   sortOrder: z.coerce.number().int().default(0),
