@@ -247,7 +247,7 @@ Trong màn hình cấu hình project (hoặc sau đó ở **Project Settings →
 Vào **Project Settings → Environment Variables**, thêm (áp dụng cho cả Production/Preview/Development tuỳ nhu cầu):
 
 ```bash
-NEXT_PUBLIC_API_URL=https://dautaytoy-api.onrender.com/api
+NEXT_PUBLIC_API_URL=https://dautaytoystore.onrender.com/api
 NEXT_PUBLIC_SITE_URL=https://your-app.vercel.app
 NEXT_PUBLIC_GOOGLE_CLIENT_ID=<google client id, để trống nếu chưa dùng>
 ```

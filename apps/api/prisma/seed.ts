@@ -178,6 +178,626 @@ async function seedCatalog() {
   return { brand, category, product };
 }
 
+const DEMO_BRANDS: Array<{
+  slug: string;
+  name: string;
+  originCountry: string;
+  description: string;
+}> = [
+  {
+    slug: 'teddy-house',
+    name: 'Teddy House',
+    originCountry: 'Việt Nam',
+    description: 'Thú nhồi bông mềm mại, an toàn cho bé, sản xuất trong nước.',
+  },
+  {
+    slug: 'vtech',
+    name: 'VTech',
+    originCountry: 'Bỉ',
+    description: 'Đồ chơi điện tử giáo dục và âm nhạc cho trẻ em.',
+  },
+  {
+    slug: 'hot-wheels',
+    name: 'Hot Wheels',
+    originCountry: 'Mỹ',
+    description: 'Xe mô hình và đường đua tốc độ nổi tiếng toàn cầu.',
+  },
+  {
+    slug: 'mattel',
+    name: 'Mattel',
+    originCountry: 'Mỹ',
+    description: 'Búp bê và phụ kiện thời trang cho bé gái.',
+  },
+  {
+    slug: 'little-tikes',
+    name: 'Little Tikes',
+    originCountry: 'Mỹ',
+    description: 'Đồ chơi vận động ngoài trời bền bỉ cho trẻ nhỏ.',
+  },
+  {
+    slug: 'ravensburger',
+    name: 'Ravensburger',
+    originCountry: 'Đức',
+    description: 'Board game và trò chơi rèn luyện trí tuệ chất lượng cao.',
+  },
+  {
+    slug: 'fisher-price',
+    name: 'Fisher-Price',
+    originCountry: 'Mỹ',
+    description: 'Đồ chơi hoá thân và phát triển kỹ năng sớm cho trẻ.',
+  },
+];
+
+const DEMO_CATEGORIES: Array<{ slug: string; name: string; description: string }> = [
+  {
+    slug: 'thu-nhoi-bong',
+    name: 'Thú nhồi bông',
+    description: 'Gấu bông, thú bông mềm mại an toàn cho bé.',
+  },
+  {
+    slug: 'do-choi-giao-duc-stem',
+    name: 'Đồ chơi giáo dục STEM',
+    description: 'Đồ chơi phát triển tư duy khoa học, công nghệ, kỹ thuật.',
+  },
+  {
+    slug: 'xe-mo-hinh',
+    name: 'Xe mô hình',
+    description: 'Xe mô hình, xe điều khiển từ xa cho bé yêu thích tốc độ.',
+  },
+  {
+    slug: 'bup-be-phu-kien',
+    name: 'Búp bê & phụ kiện',
+    description: 'Búp bê thời trang và phụ kiện đi kèm.',
+  },
+  {
+    slug: 'do-choi-ngoai-troi',
+    name: 'Đồ chơi ngoài trời',
+    description: 'Đồ chơi vận động ngoài trời giúp bé rèn luyện thể chất.',
+  },
+  {
+    slug: 'do-choi-am-nhac',
+    name: 'Đồ chơi âm nhạc',
+    description: 'Đồ chơi phát triển năng khiếu âm nhạc cho bé.',
+  },
+  {
+    slug: 'board-game-tri-tue',
+    name: 'Board game trí tuệ',
+    description: 'Trò chơi bàn cờ và board game rèn luyện tư duy.',
+  },
+  {
+    slug: 'do-choi-nha-bep',
+    name: 'Đồ chơi hoá thân',
+    description: 'Đồ chơi nhà bếp, bác sĩ giúp bé hoá thân nhập vai.',
+  },
+];
+
+const DEMO_PRODUCTS: Array<{
+  slug: string;
+  sku: string;
+  name: string;
+  brandSlug: string;
+  categorySlug: string;
+  price: number;
+  compareAtPrice?: number;
+  ageMin: number;
+  ageMax: number;
+  weightGrams: number;
+  material: string;
+  shortDescription: string;
+  description: string;
+  stock: number;
+}> = [
+  // Đồ chơi lắp ráp (thêm vào danh mục đã có sẵn từ seedCatalog)
+  {
+    slug: 'lego-friends-heartlake-city',
+    sku: 'LEGO-FRIENDS-002',
+    name: 'LEGO Friends - Trung tâm cộng đồng Heartlake City',
+    brandSlug: 'lego',
+    categorySlug: 'do-choi-lap-rap',
+    price: 1250000,
+    compareAtPrice: 1390000,
+    ageMin: 7,
+    ageMax: 12,
+    weightGrams: 980,
+    material: 'Nhựa ABS an toàn',
+    shortDescription: 'Bộ lắp ráp Heartlake City với nhiều khu vực sinh hoạt cộng đồng.',
+    description:
+      '<p>Bộ LEGO Friends tái hiện trung tâm cộng đồng Heartlake City với hơn 400 mảnh ghép, kèm nhân vật và phụ kiện sinh động.</p>',
+    stock: 60,
+  },
+  {
+    slug: 'lego-technic-xe-dua-the-thao',
+    sku: 'LEGO-TECH-003',
+    name: 'LEGO Technic - Xe đua thể thao',
+    brandSlug: 'lego',
+    categorySlug: 'do-choi-lap-rap',
+    price: 1590000,
+    ageMin: 8,
+    ageMax: 14,
+    weightGrams: 1100,
+    material: 'Nhựa ABS kỹ thuật',
+    shortDescription: 'Mô hình xe đua cơ khí chuyển động thật với cơ cấu Technic.',
+    description:
+      '<p>Bộ LEGO Technic mô phỏng xe đua thể thao với cơ cấu truyền động cơ khí thật, phù hợp cho bé yêu thích kỹ thuật.</p>',
+    stock: 40,
+  },
+  // Thú nhồi bông
+  {
+    slug: 'gau-bong-teddy-classic-40cm',
+    sku: 'TEDDY-001',
+    name: 'Gấu bông Teddy Classic 40cm',
+    brandSlug: 'teddy-house',
+    categorySlug: 'thu-nhoi-bong',
+    price: 250000,
+    ageMin: 0,
+    ageMax: 6,
+    weightGrams: 400,
+    material: 'Bông ép cao cấp, vải nhung mềm',
+    shortDescription: 'Gấu bông cổ điển mềm mại, an toàn cho bé sơ sinh.',
+    description:
+      '<p>Gấu bông Teddy Classic cao 40cm, chất liệu bông ép cao cấp không xù lông, an toàn tuyệt đối cho bé từ sơ sinh.</p>',
+    stock: 100,
+  },
+  {
+    slug: 'cun-bong-corgi-om-goi',
+    sku: 'TEDDY-002',
+    name: 'Cún bông Corgi ôm gối',
+    brandSlug: 'teddy-house',
+    categorySlug: 'thu-nhoi-bong',
+    price: 199000,
+    ageMin: 0,
+    ageMax: 6,
+    weightGrams: 350,
+    material: 'Vải nỉ mềm, bông gòn siêu sạch',
+    shortDescription: 'Cún bông Corgi hình dáng đáng yêu, ôm vừa tay bé.',
+    description:
+      '<p>Cún bông Corgi thiết kế dạng gối ôm, chất liệu vải nỉ mềm mịn, giúp bé ngủ ngon và an tâm hơn.</p>',
+    stock: 90,
+  },
+  {
+    slug: 'tho-bong-bunny-pastel-35cm',
+    sku: 'TEDDY-003',
+    name: 'Thỏ bông Bunny Pastel 35cm',
+    brandSlug: 'teddy-house',
+    categorySlug: 'thu-nhoi-bong',
+    price: 220000,
+    ageMin: 0,
+    ageMax: 6,
+    weightGrams: 320,
+    material: 'Bông ép, vải nhung pastel',
+    shortDescription: 'Thỏ bông màu pastel dịu nhẹ, phù hợp trang trí phòng bé.',
+    description:
+      '<p>Thỏ bông Bunny Pastel với tông màu nhẹ nhàng, chất liệu an toàn, vừa để chơi vừa để trang trí phòng bé.</p>',
+    stock: 85,
+  },
+  // Đồ chơi giáo dục STEM
+  {
+    slug: 'bo-xep-hinh-stem-robot-lap-trinh',
+    sku: 'VTECH-STEM-001',
+    name: 'Bộ xếp hình STEM Robot lập trình',
+    brandSlug: 'vtech',
+    categorySlug: 'do-choi-giao-duc-stem',
+    price: 690000,
+    compareAtPrice: 790000,
+    ageMin: 6,
+    ageMax: 12,
+    weightGrams: 700,
+    material: 'Nhựa ABS, mạch điện tử an toàn',
+    shortDescription: 'Robot lắp ráp có thể lập trình chuyển động cơ bản.',
+    description:
+      '<p>Bộ STEM cho phép bé tự lắp ráp robot và lập trình các chuyển động cơ bản qua ứng dụng đi kèm, phát triển tư duy logic.</p>',
+    stock: 55,
+  },
+  {
+    slug: 'kinh-hien-vi-khoa-hoc-cho-be',
+    sku: 'VTECH-STEM-002',
+    name: 'Kính hiển vi khoa học cho bé',
+    brandSlug: 'vtech',
+    categorySlug: 'do-choi-giao-duc-stem',
+    price: 450000,
+    ageMin: 8,
+    ageMax: 14,
+    weightGrams: 600,
+    material: 'Nhựa quang học, kính chịu lực',
+    shortDescription: 'Kính hiển vi độ phóng đại 100x-1200x cho bé khám phá khoa học.',
+    description:
+      '<p>Bộ kính hiển vi kèm phụ kiện tiêu bản giúp bé khám phá thế giới vi mô, khơi dậy niềm yêu thích khoa học.</p>',
+    stock: 45,
+  },
+  {
+    slug: 'bo-thi-nghiem-hoa-hoc-vui',
+    sku: 'VTECH-STEM-003',
+    name: 'Bộ thí nghiệm hoá học vui',
+    brandSlug: 'vtech',
+    categorySlug: 'do-choi-giao-duc-stem',
+    price: 380000,
+    ageMin: 8,
+    ageMax: 14,
+    weightGrams: 550,
+    material: 'Hoá chất an toàn, dụng cụ nhựa',
+    shortDescription: 'Hơn 20 thí nghiệm hoá học an toàn, trực quan cho bé.',
+    description:
+      '<p>Bộ thí nghiệm gồm hoá chất và dụng cụ an toàn, kèm sách hướng dẫn hơn 20 thí nghiệm vui cho bé tự thực hành.</p>',
+    stock: 50,
+  },
+  // Xe mô hình
+  {
+    slug: 'xe-dua-hot-wheels-track-builder',
+    sku: 'HW-001',
+    name: 'Xe đua Hot Wheels Track Builder',
+    brandSlug: 'hot-wheels',
+    categorySlug: 'xe-mo-hinh',
+    price: 320000,
+    ageMin: 4,
+    ageMax: 10,
+    weightGrams: 450,
+    material: 'Nhựa ABS, kim loại hợp kim',
+    shortDescription: 'Bộ đường đua kèm xe mô hình lắp ghép tự do.',
+    description:
+      '<p>Bộ Track Builder cho phép bé tự thiết kế đường đua với nhiều địa hình, kèm xe mô hình hợp kim tốc độ cao.</p>',
+    stock: 70,
+  },
+  {
+    slug: 'mo-hinh-xe-cuu-hoa-dieu-khien-tu-xa',
+    sku: 'HW-002',
+    name: 'Mô hình xe cứu hỏa điều khiển từ xa',
+    brandSlug: 'hot-wheels',
+    categorySlug: 'xe-mo-hinh',
+    price: 590000,
+    compareAtPrice: 650000,
+    ageMin: 5,
+    ageMax: 12,
+    weightGrams: 800,
+    material: 'Nhựa ABS, motor điện',
+    shortDescription: 'Xe cứu hỏa điều khiển từ xa với đèn và còi báo động thật.',
+    description:
+      '<p>Mô hình xe cứu hỏa tỉ lệ lớn, điều khiển từ xa, tích hợp đèn LED và âm thanh còi báo động sống động.</p>',
+    stock: 35,
+  },
+  {
+    slug: 'bo-suu-tap-xe-mo-hinh-5-chiec',
+    sku: 'HW-003',
+    name: 'Bộ sưu tập xe mô hình 5 chiếc',
+    brandSlug: 'hot-wheels',
+    categorySlug: 'xe-mo-hinh',
+    price: 280000,
+    ageMin: 3,
+    ageMax: 10,
+    weightGrams: 380,
+    material: 'Hợp kim, nhựa ABS',
+    shortDescription: 'Combo 5 xe mô hình đa dạng kiểu dáng, tỉ lệ 1:64.',
+    description:
+      '<p>Bộ 5 xe mô hình tỉ lệ 1:64 với nhiều kiểu dáng khác nhau, thích hợp sưu tầm và chơi cùng đường đua.</p>',
+    stock: 80,
+  },
+  // Búp bê & phụ kiện
+  {
+    slug: 'bup-be-barbie-dreamhouse',
+    sku: 'MATTEL-001',
+    name: 'Búp bê Barbie kèm nhà Dreamhouse',
+    brandSlug: 'mattel',
+    categorySlug: 'bup-be-phu-kien',
+    price: 1450000,
+    compareAtPrice: 1650000,
+    ageMin: 4,
+    ageMax: 10,
+    weightGrams: 1600,
+    material: 'Nhựa PVC an toàn, vải phụ kiện',
+    shortDescription: 'Búp bê Barbie kèm nhà đồ chơi 3 tầng đầy đủ nội thất.',
+    description:
+      '<p>Bộ Barbie Dreamhouse gồm búp bê và mô hình nhà 3 tầng với đầy đủ nội thất, giúp bé thoả sức sáng tạo câu chuyện.</p>',
+    stock: 25,
+  },
+  {
+    slug: 'bup-be-barbie-fashionista',
+    sku: 'MATTEL-002',
+    name: 'Búp bê thời trang Barbie Fashionista',
+    brandSlug: 'mattel',
+    categorySlug: 'bup-be-phu-kien',
+    price: 320000,
+    ageMin: 3,
+    ageMax: 10,
+    weightGrams: 250,
+    material: 'Nhựa PVC, vải trang phục',
+    shortDescription: 'Búp bê Barbie với trang phục thời trang có thể thay đổi.',
+    description:
+      '<p>Búp bê Barbie Fashionista với nhiều bộ trang phục thời trang đi kèm, khuyến khích bé sáng tạo phong cách riêng.</p>',
+    stock: 90,
+  },
+  {
+    slug: 'bo-phu-kien-xe-hoi-cho-bup-be',
+    sku: 'MATTEL-003',
+    name: 'Bộ phụ kiện xe hơi cho búp bê',
+    brandSlug: 'mattel',
+    categorySlug: 'bup-be-phu-kien',
+    price: 410000,
+    ageMin: 4,
+    ageMax: 10,
+    weightGrams: 700,
+    material: 'Nhựa ABS',
+    shortDescription: 'Xe hơi mui trần tỉ lệ phù hợp cho búp bê thời trang.',
+    description:
+      '<p>Xe hơi mui trần đầy màu sắc, thiết kế vừa vặn cho búp bê thời trang, mở rộng thế giới trò chơi của bé.</p>',
+    stock: 40,
+  },
+  // Đồ chơi ngoài trời
+  {
+    slug: 'cau-truot-lien-xich-du-mini',
+    sku: 'LT-001',
+    name: 'Cầu trượt liền xích đu mini',
+    brandSlug: 'little-tikes',
+    categorySlug: 'do-choi-ngoai-troi',
+    price: 2890000,
+    ageMin: 2,
+    ageMax: 6,
+    weightGrams: 15000,
+    material: 'Nhựa HDPE chịu lực, chống tia UV',
+    shortDescription: 'Bộ cầu trượt liền xích đu cho sân vườn, chịu lực tốt.',
+    description:
+      '<p>Bộ cầu trượt kết hợp xích đu, khung nhựa HDPE chịu lực và chống tia UV, phù hợp lắp đặt sân vườn gia đình.</p>',
+    stock: 15,
+  },
+  {
+    slug: 'xe-choi-chan-cho-be',
+    sku: 'LT-002',
+    name: 'Xe chòi chân cho bé',
+    brandSlug: 'little-tikes',
+    categorySlug: 'do-choi-ngoai-troi',
+    price: 690000,
+    ageMin: 1,
+    ageMax: 3,
+    weightGrams: 3200,
+    material: 'Nhựa ABS chịu lực',
+    shortDescription: 'Xe chòi chân giúp bé tập đi và rèn luyện vận động.',
+    description:
+      '<p>Xe chòi chân thiết kế chắc chắn, hỗ trợ bé tập đi những bước đầu tiên và rèn luyện khả năng giữ thăng bằng.</p>',
+    stock: 45,
+  },
+  {
+    slug: 'be-bong-vui-nhon-100-bong',
+    sku: 'LT-003',
+    name: 'Bể bóng vui nhộn kèm 100 bóng',
+    brandSlug: 'little-tikes',
+    categorySlug: 'do-choi-ngoai-troi',
+    price: 550000,
+    ageMin: 1,
+    ageMax: 5,
+    weightGrams: 2500,
+    material: 'Vải lưới bền, bóng nhựa an toàn',
+    shortDescription: 'Bể bóng gấp gọn kèm 100 bóng nhựa nhiều màu sắc.',
+    description:
+      '<p>Bể bóng vải lưới thoáng khí, dễ gấp gọn cất giữ, kèm 100 quả bóng nhựa an toàn nhiều màu sắc.</p>',
+    stock: 30,
+  },
+  // Đồ chơi âm nhạc
+  {
+    slug: 'dan-piano-cho-be-tap-choi',
+    sku: 'VTECH-MUSIC-001',
+    name: 'Đàn piano cho bé tập chơi',
+    brandSlug: 'vtech',
+    categorySlug: 'do-choi-am-nhac',
+    price: 450000,
+    ageMin: 1,
+    ageMax: 5,
+    weightGrams: 900,
+    material: 'Nhựa ABS an toàn',
+    shortDescription: 'Đàn piano mini nhiều âm thanh, đèn nhạc sinh động.',
+    description:
+      '<p>Đàn piano mini với các phím đàn phát âm thanh và đèn LED sinh động, giúp bé làm quen với âm nhạc từ sớm.</p>',
+    stock: 60,
+  },
+  {
+    slug: 'trong-luc-lac-am-nhac-vui-nhon',
+    sku: 'VTECH-MUSIC-002',
+    name: 'Trống lục lạc âm nhạc vui nhộn',
+    brandSlug: 'vtech',
+    categorySlug: 'do-choi-am-nhac',
+    price: 250000,
+    ageMin: 0,
+    ageMax: 3,
+    weightGrams: 400,
+    material: 'Nhựa ABS, vải bọc mềm',
+    shortDescription: 'Bộ trống và lục lạc âm thanh vui nhộn cho bé sơ sinh.',
+    description:
+      '<p>Bộ nhạc cụ mini gồm trống và lục lạc, âm thanh vui nhộn kích thích thính giác cho bé từ sơ sinh.</p>',
+    stock: 75,
+  },
+  {
+    slug: 'micro-karaoke-mini-cho-be',
+    sku: 'VTECH-MUSIC-003',
+    name: 'Micro karaoke mini cho bé',
+    brandSlug: 'vtech',
+    categorySlug: 'do-choi-am-nhac',
+    price: 320000,
+    ageMin: 3,
+    ageMax: 8,
+    weightGrams: 300,
+    material: 'Nhựa ABS, loa mini tích hợp',
+    shortDescription: 'Micro karaoke kèm loa và hiệu ứng ánh sáng theo nhạc.',
+    description:
+      '<p>Micro karaoke mini tích hợp loa và hiệu ứng đèn theo nhịp nhạc, giúp bé thoả sức ca hát và biểu diễn.</p>',
+    stock: 65,
+  },
+  // Board game trí tuệ
+  {
+    slug: 'co-vua-go-cao-cap-cho-be',
+    sku: 'RVB-001',
+    name: 'Cờ vua gỗ cao cấp cho bé',
+    brandSlug: 'ravensburger',
+    categorySlug: 'board-game-tri-tue',
+    price: 350000,
+    ageMin: 6,
+    ageMax: 14,
+    weightGrams: 1200,
+    material: 'Gỗ tự nhiên sơn an toàn',
+    shortDescription: 'Bộ cờ vua gỗ thủ công, quân cờ chạm khắc tinh xảo.',
+    description:
+      '<p>Bộ cờ vua gỗ tự nhiên, quân cờ chạm khắc tinh xảo, giúp bé rèn luyện tư duy chiến thuật từ sớm.</p>',
+    stock: 40,
+  },
+  {
+    slug: 'bo-xep-hinh-100-manh-dong-vat',
+    sku: 'RVB-002',
+    name: 'Bộ xếp hình 100 mảnh chủ đề động vật',
+    brandSlug: 'ravensburger',
+    categorySlug: 'board-game-tri-tue',
+    price: 180000,
+    ageMin: 4,
+    ageMax: 10,
+    weightGrams: 350,
+    material: 'Giấy bìa cứng cao cấp',
+    shortDescription: 'Bộ xếp hình 100 mảnh chủ đề động vật hoang dã.',
+    description:
+      '<p>Bộ xếp hình 100 mảnh in hình động vật hoang dã sắc nét, giúp bé rèn luyện khả năng quan sát và kiên nhẫn.</p>',
+    stock: 70,
+  },
+  {
+    slug: 'tro-choi-tri-nho-memory-match',
+    sku: 'RVB-003',
+    name: 'Trò chơi trí nhớ Memory Match',
+    brandSlug: 'ravensburger',
+    categorySlug: 'board-game-tri-tue',
+    price: 210000,
+    ageMin: 4,
+    ageMax: 10,
+    weightGrams: 300,
+    material: 'Giấy bìa cứng, hộp nhựa',
+    shortDescription: 'Trò chơi lật thẻ ghi nhớ hình ảnh, rèn trí nhớ cho bé.',
+    description:
+      '<p>Trò chơi Memory Match gồm các cặp thẻ hình ảnh sinh động, giúp bé rèn luyện trí nhớ và khả năng tập trung.</p>',
+    stock: 65,
+  },
+  // Đồ chơi hoá thân
+  {
+    slug: 'bo-do-choi-nha-bep-mini',
+    sku: 'FP-001',
+    name: 'Bộ đồ chơi nhà bếp mini',
+    brandSlug: 'fisher-price',
+    categorySlug: 'do-choi-nha-bep',
+    price: 590000,
+    compareAtPrice: 690000,
+    ageMin: 3,
+    ageMax: 8,
+    weightGrams: 1300,
+    material: 'Nhựa ABS an toàn',
+    shortDescription: 'Bộ bếp mini đầy đủ dụng cụ nấu ăn cho bé hoá thân đầu bếp.',
+    description:
+      '<p>Bộ đồ chơi nhà bếp mini với bếp nấu, nồi, chảo và thực phẩm giả, giúp bé hoá thân thành đầu bếp nhí.</p>',
+    stock: 35,
+  },
+  {
+    slug: 'bo-dung-cu-bac-si-cho-be',
+    sku: 'FP-002',
+    name: 'Bộ dụng cụ bác sĩ cho bé',
+    brandSlug: 'fisher-price',
+    categorySlug: 'do-choi-nha-bep',
+    price: 280000,
+    ageMin: 3,
+    ageMax: 8,
+    weightGrams: 500,
+    material: 'Nhựa ABS an toàn',
+    shortDescription: 'Bộ dụng cụ khám bệnh mini kèm vali xách tay.',
+    description:
+      '<p>Bộ dụng cụ bác sĩ mini gồm ống nghe, nhiệt kế, kim tiêm giả kèm vali xách tay tiện lợi cho bé nhập vai.</p>',
+    stock: 50,
+  },
+  {
+    slug: 'bo-do-choi-lam-banh-mini',
+    sku: 'FP-003',
+    name: 'Bộ đồ chơi làm bánh mini',
+    brandSlug: 'fisher-price',
+    categorySlug: 'do-choi-nha-bep',
+    price: 320000,
+    ageMin: 3,
+    ageMax: 8,
+    weightGrams: 600,
+    material: 'Nhựa ABS an toàn',
+    shortDescription: 'Bộ dụng cụ làm bánh mini cho bé thoả sức sáng tạo.',
+    description:
+      '<p>Bộ đồ chơi làm bánh mini với khuôn, dụng cụ trộn và bánh giả nhiều màu sắc, kích thích trí tưởng tượng của bé.</p>',
+    stock: 55,
+  },
+];
+
+async function seedDemoCatalog() {
+  const brands: Record<string, { id: string }> = {};
+  for (const b of DEMO_BRANDS) {
+    brands[b.slug] = await prisma.brand.upsert({
+      where: { slug: b.slug },
+      update: {},
+      create: {
+        name: b.name,
+        slug: b.slug,
+        description: b.description,
+        originCountry: b.originCountry,
+      },
+    });
+  }
+
+  // 'lego' was already created by seedCatalog(); look it up for the extra LEGO products.
+  brands['lego'] = await prisma.brand.findUniqueOrThrow({ where: { slug: 'lego' } });
+
+  const categories: Record<string, { id: string }> = {};
+  for (const c of DEMO_CATEGORIES) {
+    categories[c.slug] = await prisma.category.upsert({
+      where: { slug: c.slug },
+      update: {},
+      create: {
+        name: c.name,
+        slug: c.slug,
+        description: c.description,
+      },
+    });
+  }
+  // 'do-choi-lap-rap' was already created by seedCatalog(); look it up for the extra LEGO products.
+  categories['do-choi-lap-rap'] = await prisma.category.findUniqueOrThrow({
+    where: { slug: 'do-choi-lap-rap' },
+  });
+
+  for (const p of DEMO_PRODUCTS) {
+    await prisma.product.upsert({
+      where: { slug: p.slug },
+      update: {},
+      create: {
+        name: p.name,
+        slug: p.slug,
+        sku: p.sku,
+        brandId: brands[p.brandSlug].id,
+        status: 'PUBLISHED',
+        shortDescription: p.shortDescription,
+        description: p.description,
+        price: p.price,
+        compareAtPrice: p.compareAtPrice,
+        material: p.material,
+        ageMin: p.ageMin,
+        ageMax: p.ageMax,
+        weightGrams: p.weightGrams,
+        publishedAt: new Date('2026-03-01T00:00:00.000Z'),
+        categories: {
+          create: [{ categoryId: categories[p.categorySlug].id }],
+        },
+        images: {
+          create: [
+            {
+              url: `https://placehold.co/800x800?text=${encodeURIComponent(p.name)}`,
+              altText: p.name,
+              isPrimary: true,
+              sortOrder: 0,
+            },
+          ],
+        },
+        inventory: {
+          create: {
+            quantityOnHand: p.stock,
+            quantityReserved: 0,
+            lowStockThreshold: 10,
+          },
+        },
+      },
+    });
+  }
+}
+
 async function seedContent() {
   const faqEntries: Array<{ question: string; answer: string; category: string; sortOrder: number }> = [
     {
@@ -261,6 +881,7 @@ async function main() {
   await seedRolesAndPermissions();
   await seedAdminUser();
   await seedCatalog();
+  await seedDemoCatalog();
   await seedContent();
 }
 
