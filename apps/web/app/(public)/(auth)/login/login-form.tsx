@@ -12,6 +12,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { PasswordInput } from '@/components/ui/password-input';
 import { CART_QUERY_KEY } from '@/hooks/use-cart';
+import { WISHLIST_QUERY_KEY } from '@/hooks/use-wishlist';
 import { ApiError } from '@/lib/api-client';
 import { authApi } from '@/lib/api/auth';
 import { useAuthStore } from '@/store/auth-store';
@@ -37,7 +38,12 @@ export function LoginForm() {
       setSession(response.user, response.tokens);
       // The API may have just merged a guest cart into this account's cart —
       // drop the cached (pre-login) cart so the next read reflects the merge.
-      await queryClient.invalidateQueries({ queryKey: CART_QUERY_KEY });
+      // The wishlist is per-user, so refetch it too — otherwise a stale/empty
+      // cache from before login (e.g. the guest state) would be shown.
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: CART_QUERY_KEY }),
+        queryClient.invalidateQueries({ queryKey: WISHLIST_QUERY_KEY }),
+      ]);
       router.push('/');
       router.refresh();
     } catch (error) {
