@@ -40,7 +40,14 @@ Kiểm tra bạn đã có sẵn (nếu chưa, xem `docs/architecture.md` phần 
   MoMo không báo lỗi ngay nếu URL sai/không truy cập được (chỉ lặng lẽ gửi IPN thất bại), nên cần
   double-check `MOMO_IPN_URL` là domain public, có TLS hợp lệ, trước giao dịch sandbox đầu tiên.
   Để trống vẫn deploy được bình thường, COD/VNPay không bị ảnh hưởng.
-- [ ] Google OAuth Client ID/Secret (nếu dùng đăng nhập Google) — từ Google Cloud Console
+- [ ] Google OAuth Client ID (tuỳ chọn) — **lưu ý quan trọng**: backend xác thực Google bằng ID
+  token (`POST /api/auth/google`, `google-auth-library`'s `verifyIdToken`), không dùng flow
+  redirect OAuth cổ điển — nên chỉ `GOOGLE_CLIENT_ID` thực sự được code đọc (dùng làm `audience`).
+  `GOOGLE_CLIENT_SECRET`/`GOOGLE_CALLBACK_URL` tồn tại trong config nhưng **không được code nào
+  đọc** — set hay không cũng không ảnh hưởng gì. Quan trọng hơn: **`apps/web` hiện chưa có nút/UI
+  đăng nhập Google nào** (trang login chỉ có email/mật khẩu) — endpoint backend đã sẵn sàng
+  (cho mobile app tương lai chẳng hạn) nhưng chưa có cách nào để người dùng web thực sự dùng tính
+  năng này. Có thể bỏ qua toàn bộ mục này khi deploy — không có gì bị ảnh hưởng
 - [ ] 2 chuỗi bí mật JWT ngẫu nhiên, tối thiểu 32 ký tự mỗi chuỗi (`JWT_ACCESS_SECRET`, `JWT_REFRESH_SECRET`). Tạo nhanh:
   ```bash
   openssl rand -base64 48
@@ -98,10 +105,13 @@ JWT_ACCESS_EXPIRES_IN=15m
 JWT_REFRESH_SECRET=<chuỗi ngẫu nhiên khác, ít nhất 32 ký tự>
 JWT_REFRESH_EXPIRES_IN=30d
 
-# Google OAuth (tuỳ chọn — để trống nếu chưa dùng đăng nhập Google)
+# Google OAuth (tuỳ chọn, và hiện chưa có UI nào ở web dùng tới — xem ghi chú ở mục 0).
+# Chỉ GOOGLE_CLIENT_ID thực sự được code đọc; 2 biến dưới tồn tại trong config nhưng không
+# được dùng ở đâu cả (flow thật là verify ID token, không phải redirect OAuth) — có thể để trống
+# cả 3, hoặc bỏ hẳn 2 dòng dưới nếu muốn dọn dẹp.
 GOOGLE_CLIENT_ID=
 GOOGLE_CLIENT_SECRET=
-GOOGLE_CALLBACK_URL=https://dautaytoy-api.onrender.com/api/auth/google/callback
+GOOGLE_CALLBACK_URL=
 
 # CORS — điền URL Vercel THẬT sau khi deploy xong bước 2 (xem mục 3.1)
 CORS_ORIGIN=https://your-app.vercel.app
@@ -154,7 +164,11 @@ Trong tab **Settings** → **Health Check Path**, điền:
 ```
 /api/health
 ```
-(Route này đã có sẵn, kiểm tra cả Postgres lẫn Redis còn sống — Render dùng nó để biết service có "healthy" hay không trước khi route traffic vào.)
+(Route này đã có sẵn, kiểm tra Postgres còn sống + memory heap — Render dùng nó để biết service
+có "healthy" hay không trước khi route traffic vào. **Lưu ý**: route này KHÔNG kiểm tra Redis —
+nếu `REDIS_URL` sai/Upstash sập, `/api/health` vẫn trả `status: ok` bình thường, chỉ có
+`EmailProcessor`/BullMQ âm thầm không hoạt động. Nếu nghi ngờ Redis có vấn đề, kiểm tra riêng qua
+Upstash Console hoặc thử trigger một email quên-mật-khẩu và xem log.)
 
 ### 1.4. Chạy Prisma migration lần đầu
 
@@ -270,11 +284,13 @@ CORS_ORIGIN=https://your-app.vercel.app,https://your-app-git-main-yourteam.verce
 Nếu bạn đặt tên service Render khác, hoặc dùng custom domain sau này, cập nhật lại
 `NEXT_PUBLIC_API_URL` trên Vercel rồi **Redeploy**.
 
-### 3.3. Google OAuth (nếu dùng)
+### 3.3. Google OAuth
 
-Vào [Google Cloud Console](https://console.cloud.google.com/apis/credentials) → OAuth Client → thêm:
-- **Authorized JavaScript origins**: `https://your-app.vercel.app`
-- **Authorized redirect URIs**: `https://dautaytoy-api.onrender.com/api/auth/google/callback`
+Không cần bước này để deploy — như đã ghi ở mục 0, `apps/web` hiện chưa có UI đăng nhập Google
+nào, và flow thật (verify ID token) không dùng redirect URI. Nếu sau này có nhu cầu thêm nút
+đăng nhập Google trên web (hoặc mobile app), lúc đó chỉ cần vào
+[Google Cloud Console](https://console.cloud.google.com/apis/credentials) → OAuth Client → thêm
+**Authorized JavaScript origins**: domain thật của web — không cần khai báo redirect URI nào.
 
 ---
 
