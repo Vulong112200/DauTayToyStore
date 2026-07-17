@@ -192,6 +192,14 @@ pnpm exec prisma db seed
 
 > `prisma db seed` tạo tài khoản admin mặc định (`admin@dautaytoystore.vn` / `Admin@123456`) —
 > **đổi mật khẩu này ngay sau khi seed xong trên production**, đừng để mặc định.
+>
+> Seed cũng tạo sẵn một **catalog demo** (nhiều sản phẩm/danh mục/thương hiệu + bài blog) và
+> **upload ảnh demo lên R2** qua `seedDemoImages()` (tạo luôn bản ghi `MediaAsset`, giống hệt luồng
+> admin upload), rồi gán URL R2 cho sản phẩm/blog. Nếu R2 chưa cấu hình (thiếu `R2_*`), nó tự
+> fallback về đường dẫn ảnh nội bộ `/demo/...` trong `apps/web/public` — seed vẫn chạy được, chỉ là
+> ảnh trỏ nội bộ thay vì R2. ⇒ Nếu muốn ảnh demo nằm trên R2 như production, đảm bảo các biến `R2_*`
+> đã có mặt ở nơi chạy seed (Render Shell đã có sẵn env; nếu chạy từ máy local thì `apps/api/.env`
+> phải có `R2_*`).
 
 ### 1.5. Xác nhận API đã chạy
 

@@ -1,5 +1,36 @@
 # Architecture Decisions
 
+## Phase 4+ — Real demo catalog images provisioned through R2, and a data-driven home page
+
+### The broken images were placeholders returning SVG, which `next/image` refuses to optimize
+The seed shipped `placehold.co/...` URLs with no file extension; `placehold.co` serves SVG by
+default, and Next's image optimizer rejects SVG unless `dangerouslyAllowSVG` is set (it isn't), so
+every product/blog image rendered broken (the browser showed alt text). The fix wasn't a config
+flag — it was to seed real images.
+
+### `seedDemoImages()` mirrors the production media flow instead of hardcoding URLs
+Curated, freely-licensed toy photos are bundled under `apps/web/public/demo` (the reproducible
+source) and, at seed time, uploaded to R2 + recorded as `MediaAsset` rows exactly like
+`AdminMediaService.upload` does — then each product's primary `ProductImage` and each blog
+`coverImageUrl` point at the R2 URL. It falls back to the local `/demo/...` path when R2 env is
+absent, so `pnpm db:seed` still works offline. This keeps demo data on the same storage path as
+real admin uploads (the images even show up in `/admin/media` and are reusable via `MediaPicker`).
+
+### A separate reconcile pass, because the product/blog upserts use `update: {}`
+`seedCatalog`/`seedDemoCatalog`/`seedContent` upsert with `update: {}` (a no-op on existing rows),
+so editing the create-block URLs would never touch already-seeded data. `seedDemoImages()` runs
+after them, keyed by slug: delete+recreate the primary `ProductImage`, update
+`BlogPost.coverImageUrl`, and upsert `MediaAsset` on its unique `key` — fully idempotent across
+re-runs (stable R2 keys, so re-seeding overwrites the same object/row instead of duplicating).
+
+### The home page is now data-driven, not hardcoded
+`CategoryHighlights` and `FeaturedProducts` (`components/home/`) were hardcoded arrays with
+placeholder images and category links to slugs that 404'd. They're now Server Components fetching
+live data (`categoriesApi.tree()` top-5; `productsApi.list({ sort: 'rating', pageSize: 4 })`),
+reusing the storefront `ProductCard` and a new shared `CategoryIcon`
+(`components/catalog/category-icon.tsx`) that falls back to a pastel placeholder when a category
+has no `imageUrl`.
+
 ## Phase 4 — Permission-level RBAC enforcement (`PermissionsGuard`)
 
 ### Additive, not a replacement — `@RequirePermissions()` only tightens what `@Roles()` already gates

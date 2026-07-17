@@ -199,14 +199,28 @@ react-hook-form's `Controller`, not `register`, since the value can change from 
 `onChange` (picking a library asset). The picker's own preview thumbnail renders with a plain
 `<img>`, not `next/image` — its value can be any admin-pasted URL, not just R2 asset URLs, so it
 can't rely on `next.config`'s `remotePatterns` whitelist the way `/admin/media`'s own asset grid
-(always R2 URLs) safely can.
+(always R2 URLs) safely can. Demo/seed data is provisioned through this same R2 path rather than
+hardcoded placeholder URLs: `prisma/seed.ts`'s `seedDemoImages()` uploads the toy photos bundled
+under `apps/web/public/demo` (the reproducible source) to R2 and records each as a `MediaAsset` —
+mirroring `AdminMediaService.upload` (R2 write + `MediaAsset` row) — then points each product's
+primary `ProductImage` and each blog `coverImageUrl` at the resulting R2 URL, falling back to the
+local `/demo/...` path only when R2 env isn't configured. It runs as a separate reconcile pass
+(delete+recreate the primary image per slug, keyed off the slug maps) rather than inside the
+product/blog `create` blocks, because those upsert with `update: {}` — a no-op on already-seeded
+rows — so changing the create-block URLs alone would never touch existing data.
 
 **Frontend rendering split**: catalog pages (`/categories`, `/categories/[slug]`, `/products`,
 `/products/[slug]`) are Server Components fetching directly with ISR
 (`fetch(..., { next: { revalidate } })`) for SEO. Cart and auth are client-side (TanStack Query +
 Zustand) since they're per-visitor and mutable. Auth pages (`app/(auth)/...`) each split into a
 server component that only exports `metadata` plus a co-located `'use client'` form component, to
-keep `'use client'` scoped as small as possible while still getting server-rendered metadata.
+keep `'use client'` scoped as small as possible while still getting server-rendered metadata. The
+home page (`app/(public)/page.tsx`) is likewise all Server Components: a static hero plus
+`CategoryHighlights` (fetches `categoriesApi.tree()`, top 5) and `FeaturedProducts` (fetches
+`productsApi.list({ sort: 'rating', pageSize: 4 })`) — these replaced hardcoded arrays that had
+drifted (placeholder images + category links pointing at slugs that 404'd). Category thumbnails
+render via the shared `CategoryIcon` (`components/catalog/category-icon.tsx`), which shows the
+category's `imageUrl` or falls back to a pastel placeholder icon when it's null.
 
 **Background jobs**: `QueueModule` registers `email`/`media`/`ai` BullMQ queues against Redis;
 only `email` has a consumer (`EmailProcessor`). It sends through Resend's HTTP API via
