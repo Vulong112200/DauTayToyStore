@@ -111,6 +111,7 @@ export function CartView() {
                     type="button"
                     className="p-1.5 disabled:opacity-50"
                     aria-label="Giảm số lượng"
+                    title="Giảm số lượng"
                     disabled={updateItem.isPending || item.quantity <= 1}
                     onClick={() =>
                       updateItem.mutate({
@@ -126,6 +127,7 @@ export function CartView() {
                     type="button"
                     className="p-1.5 disabled:opacity-50"
                     aria-label="Tăng số lượng"
+                    title="Tăng số lượng"
                     disabled={updateItem.isPending || item.quantity >= item.availableStock}
                     onClick={() =>
                       updateItem.mutate({

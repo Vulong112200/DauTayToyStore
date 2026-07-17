@@ -45,6 +45,7 @@ export function WishlistButton({
       onClick={handleClick}
       disabled={isPending}
       aria-label={isInWishlist ? 'Xoá khỏi danh sách yêu thích' : 'Thêm vào danh sách yêu thích'}
+      title={isInWishlist ? 'Xoá khỏi danh sách yêu thích' : 'Thêm vào danh sách yêu thích'}
       aria-pressed={isInWishlist}
       className={cn(
         'flex h-9 w-9 items-center justify-center rounded-full bg-background/90 shadow-sm transition-colors hover:bg-background disabled:opacity-50',

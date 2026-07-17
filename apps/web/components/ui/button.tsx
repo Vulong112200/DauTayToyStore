@@ -36,10 +36,20 @@ export interface ButtonProps
 }
 
 const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
-  ({ className, variant, size, asChild = false, ...props }, ref) => {
+  ({ className, variant, size, asChild = false, title, ...props }, ref) => {
     const Comp = asChild ? Slot : 'button';
+    const ariaLabel = props['aria-label'];
+    // Icon-only buttons have no visible text, so surface their aria-label as a
+    // native hover tooltip (title) — lets users tell what each icon does.
+    const resolvedTitle =
+      title ?? (size === 'icon' && typeof ariaLabel === 'string' ? ariaLabel : undefined);
     return (
-      <Comp className={cn(buttonVariants({ variant, size, className }))} ref={ref} {...props} />
+      <Comp
+        className={cn(buttonVariants({ variant, size, className }))}
+        ref={ref}
+        title={resolvedTitle}
+        {...props}
+      />
     );
   },
 );
