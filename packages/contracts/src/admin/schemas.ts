@@ -432,9 +432,11 @@ export type CouponType = z.infer<typeof couponTypeSchema>;
 
 const couponCodeSchema = z
   .string()
+  .trim()
   .min(3, 'Mã quá ngắn')
   .max(30)
-  .regex(/^[A-Z0-9_-]+$/, 'Mã chỉ gồm chữ hoa, số, gạch ngang và gạch dưới');
+  .regex(/^[A-Za-z0-9_-]+$/, 'Mã chỉ gồm chữ cái, số, gạch ngang và gạch dưới')
+  .transform((code) => code.toUpperCase());
 
 export const couponInputSchema = z
   .object({
@@ -635,9 +637,11 @@ export type UpdateSiteSettingsInput = z.infer<typeof updateSiteSettingsSchema>;
 
 const giftVoucherCodeSchema = z
   .string()
+  .trim()
   .min(3, 'Mã quá ngắn')
   .max(30)
-  .regex(/^[A-Z0-9_-]+$/, 'Mã chỉ gồm chữ hoa, số, gạch ngang và gạch dưới');
+  .regex(/^[A-Za-z0-9_-]+$/, 'Mã chỉ gồm chữ cái, số, gạch ngang và gạch dưới')
+  .transform((code) => code.toUpperCase());
 
 export const giftVoucherInputSchema = z.object({
   code: giftVoucherCodeSchema,
