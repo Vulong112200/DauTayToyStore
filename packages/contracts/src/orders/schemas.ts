@@ -11,6 +11,9 @@ export const orderStatusSchema = z.enum([
 ]);
 export type OrderStatus = z.infer<typeof orderStatusSchema>;
 
+export const paymentMethodSchema = z.enum(['COD', 'VNPAY']);
+export type PaymentMethod = z.infer<typeof paymentMethodSchema>;
+
 export const checkoutSchema = z.object({
   customerName: z.string().min(2, 'Họ tên quá ngắn').max(100),
   customerEmail: z.string().email('Email không hợp lệ'),
@@ -22,6 +25,7 @@ export const checkoutSchema = z.object({
   shippingProvince: z.string().min(2, 'Vui lòng chọn tỉnh/thành phố'),
   shippingPostalCode: z.string().optional(),
   note: z.string().max(500).optional(),
+  paymentMethod: paymentMethodSchema.default('COD'),
 });
 export type CheckoutInput = z.infer<typeof checkoutSchema>;
 
@@ -72,6 +76,12 @@ export const orderViewSchema = z.object({
   createdAt: z.string().datetime(),
 });
 export type OrderView = z.infer<typeof orderViewSchema>;
+
+export const checkoutResultSchema = z.object({
+  order: orderViewSchema,
+  paymentUrl: z.string().url().nullable(),
+});
+export type CheckoutResult = z.infer<typeof checkoutResultSchema>;
 
 export const orderListItemSchema = z.object({
   orderNumber: z.string(),

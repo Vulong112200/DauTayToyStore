@@ -1,7 +1,8 @@
-import { Body, Controller, Get, Param, Post, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Ip, Param, Post, Query, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import {
   type CheckoutInput,
+  type CheckoutResult,
   type OrderListItem,
   type OrderTrackQuery,
   type OrderView,
@@ -29,8 +30,9 @@ export class OrdersController {
   checkout(
     @CurrentCartIdentity() identity: CartIdentity,
     @Body(new ZodValidationPipe(checkoutSchema)) body: CheckoutInput,
-  ): Promise<OrderView> {
-    return this.ordersService.checkout(identity, body);
+    @Ip() ipAddr: string,
+  ): Promise<CheckoutResult> {
+    return this.ordersService.checkout(identity, body, ipAddr);
   }
 
   @Get('track')

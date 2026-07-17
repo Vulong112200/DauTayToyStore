@@ -352,6 +352,75 @@ actually has left, even if the warehouse has plenty of the product at full price
 with 50 units in the warehouse but only 1 flash-sale slot remaining, the cart correctly reported
 `availableStock: 1` and rejected an add-to-cart request for 2.
 
+## Phase 4+ — VNPay payment gateway (sandbox)
+
+The first real payment gateway, replacing checkout's previous COD-only hardcoding. Scoped to
+VNPay only (MoMo/Stripe enum values already exist in `Payment.method` but remain unused); no
+Prisma migration was needed — `PaymentMethod.VNPAY`, `PaymentStatus`, and `Payment.transactionId`/
+`paidAt` had already been modeled ahead of time. `checkoutSchema` gained an additive
+`paymentMethod: z.enum(['COD','VNPAY']).default('COD')` field, so any existing caller that omits
+it keeps today's COD behavior unchanged; the checkout endpoint's response grew from a bare
+`OrderView` to `{ order, paymentUrl }` (`paymentUrl` is `null` for COD).
+
+### Atomic compare-and-swap idempotency, not read-then-branch
+
+VNPay confirms a payment through **two independent channels** that can both fire for the same
+order: the customer's browser redirect back to `GET /payments/vnpay/return`, and VNPay's own
+server-to-server IPN callback (`GET /payments/vnpay/ipn`) — either can arrive first, both must be
+handled safely if they race. `PaymentsService.confirmVnpayPayment()` (shared by both routes) does
+**not** `findUnique` the `Payment` row, check `status === 'PENDING'` in application code, then
+issue a separate `update` — that read-then-branch shape lets two concurrent calls both observe
+PENDING before either commits, double-processing the confirmation. Instead, the mutation itself
+is the atomicity boundary: `payment.updateMany({ where: { orderId, status: 'PENDING' }, data: {...} })`.
+Postgres re-checks an `UPDATE`'s `WHERE` clause after acquiring the row lock, so a second
+concurrent call's `updateMany` blocks until the first commits, then sees the row is no longer
+PENDING and matches zero rows — cheaply and correctly resolving to `'already_processed'` with no
+explicit `SERIALIZABLE` isolation or retry loop needed. The same compare-and-swap framing guards
+the `Order.status` PENDING→CONFIRMED transition, so a payment that succeeds after an admin already
+moved the order elsewhere (e.g. manually cancelled while payment was in flight) can never clobber
+that decision — it's instead logged at `error` level and recorded as an `OrderStatusHistory` note
+("cần đối soát/hoàn tiền thủ công") so a human finds it from the order-detail screen they already
+use, not just from infra logs. Every outcome (success, failure, amount mismatch, already-processed)
+writes an `OrderStatusHistory` row, not only the success path — otherwise FAILED/mismatch events
+would leave zero durable trail anywhere.
+
+### VNPay's IPN is a GET with query params, not a POST body
+
+A common real-world integration mistake: VNPay's classic v2.1.0 IPN calls back with the exact same
+query-param shape as the browser return URL (`vnp_TxnRef`, `vnp_ResponseCode`, `vnp_Amount`, etc.),
+as a GET request — not a POST with a JSON/form body. Both `PaymentsController` routes share one
+`VnpayService.parseAndVerifyCallback()` parser for this reason. The IPN handler responds with
+VNPay's required `{RspCode, Message}` JSON shape mapped from `confirmVnpayPayment`'s outcome
+(`'00'` Confirm Success / `'01'` order not found / `'02'` already confirmed / `'04'` invalid
+amount / `'97'` invalid signature) — never a redirect, since nothing is browsing it.
+
+### Signature encoding: VNPay's own convention, not plain `encodeURIComponent`
+
+`common/utils/vnpay.util.ts`'s `encodeVnpayValue()` percent-encodes via `encodeURIComponent` and
+then rewrites `%20` to `+` — VNPay's own reference implementation does exactly this (a
+`application/x-www-form-urlencoded`-style convention layered on top of stricter percent-encoding).
+Any value containing a space (`vnp_OrderInfo` always does) would silently break the HMAC-SHA512
+signature if the two sides used different encodings — this is the single most common real-world
+VNPay integration bug. `vnp_CreateDate` is likewise always formatted in `Asia/Ho_Chi_Minh` (GMT+7)
+regardless of the server's own timezone (`formatVnpayCreateDate`), since VNPay validates against
+Vietnam's clock specifically.
+
+### Explicitly out of scope this pass
+
+- **MoMo, Stripe** — enum values reserved, not implemented.
+- **Admin UI to view/refund payments** — not built; the `OrderStatusHistory` notes above are
+  today's only surface for staff to notice a payment needs manual attention.
+- **Automatic VNPay refund API call when an order is later CANCELLED** — admin refunds manually
+  in the VNPay merchant portal for now, same conservative posture the codebase already had for "no
+  real payment gateway yet" everywhere else.
+- **A "retry payment" flow for a `FAILED` VNPay payment** — the customer places a new order
+  instead today. Whoever builds retry later must not reuse the same `orderNumber` as `vnp_TxnRef`
+  for a second attempt (VNPay acquirers commonly reject/deduplicate a repeated ref within a rolling
+  window) — suffix it, e.g. `orderNumber-attemptN`.
+- **VNPay merchant dashboard IPN registration** — `VNPAY_RETURN_URL` is an env var this app reads,
+  but the IPN URL (`<API public URL>/api/payments/vnpay/ipn`) must additionally be registered once
+  inside the VNPay merchant portal itself; no env var/code path can do this.
+
 ## Phase 3 — Remaining marketing entities (GiftVoucher, ComboDeal, BuyXGetYRule, FreeShippingRule)
 
 ### Scope: admin CRUD only, same as FlashSale/Banner — no storefront/checkout wiring

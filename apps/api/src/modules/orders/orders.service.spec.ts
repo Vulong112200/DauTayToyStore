@@ -1,12 +1,14 @@
 import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { PromotionContextService } from '../../common/promotion-context/promotion-context.service';
 import { PrismaService } from '../../infra/prisma/prisma.service';
+import { VnpayService } from '../payments/vnpay.service';
 import { AdminSettingsService } from '../settings/admin-settings.service';
 import { OrdersService } from './orders.service';
 
 describe('OrdersService', () => {
   let service: OrdersService;
   let adminSettingsService: { getSettings: jest.Mock };
+  let vnpayService: { buildPaymentUrl: jest.Mock };
   let promotionContext: {
     loadFlashSaleItems: jest.Mock;
     loadComboDeals: jest.Mock;
@@ -30,6 +32,7 @@ describe('OrdersService', () => {
     customerPhone: '0912345678',
     shippingLine1: '123 Đường ABC',
     shippingProvince: 'TP.HCM',
+    paymentMethod: 'COD' as const,
   };
 
   function cartWithItems(items: unknown[]) {
@@ -88,10 +91,14 @@ describe('OrdersService', () => {
       loadBuyXGetYRules: jest.fn().mockResolvedValue([]),
       loadFreeShippingRules: jest.fn().mockResolvedValue([]),
     };
+    vnpayService = {
+      buildPaymentUrl: jest.fn().mockReturnValue('https://sandbox.vnpayment.vn/paymentv2/vpcpay.html?mock=1'),
+    };
     service = new OrdersService(
       prisma as unknown as PrismaService,
       adminSettingsService as unknown as AdminSettingsService,
       promotionContext as unknown as PromotionContextService,
+      vnpayService as unknown as VnpayService,
     );
   });
 
@@ -179,8 +186,40 @@ describe('OrdersService', () => {
         data: { quantityReserved: { increment: 2 } },
       });
       expect(prisma.cartItem.deleteMany).toHaveBeenCalledWith({ where: { cartId: 'cart-1' } });
-      expect(result.orderNumber).toBe('DTT12345678');
-      expect(result.items[0]?.productSlug).toBe('lego-city');
+      expect(result.order.orderNumber).toBe('DTT12345678');
+      expect(result.order.items[0]?.productSlug).toBe('lego-city');
+      expect(result.paymentUrl).toBeNull();
+      expect(vnpayService.buildPaymentUrl).not.toHaveBeenCalled();
+    });
+
+    it('creates a VNPAY payment and returns a paymentUrl instead of null', async () => {
+      prisma.cart.findFirst.mockResolvedValue(cartWithItems([publishedItem()]));
+      prisma.order.create.mockResolvedValue({
+        orderNumber: 'DTT12345678',
+        items: [{ product: { slug: 'lego-city' } }],
+        statusHistory: [],
+        createdAt: new Date('2026-01-01'),
+      });
+
+      const result = await service.checkout(
+        { sessionId: 's1' },
+        { ...checkoutInput, paymentMethod: 'VNPAY' },
+        '203.0.113.5',
+      );
+
+      expect(prisma.order.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            payment: { create: { method: 'VNPAY', status: 'PENDING', amount: 230000 } },
+          }),
+        }),
+      );
+      expect(vnpayService.buildPaymentUrl).toHaveBeenCalledWith({
+        orderNumber: 'DTT12345678',
+        amount: 230000,
+        ipAddr: '203.0.113.5',
+      });
+      expect(result.paymentUrl).toBe('https://sandbox.vnpayment.vn/paymentv2/vpcpay.html?mock=1');
     });
 
     it('applies free shipping above the threshold', async () => {

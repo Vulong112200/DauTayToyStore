@@ -1,10 +1,16 @@
-import type { CheckoutInput, OrderListItem, OrderTrackQuery, OrderView } from '@repo/contracts';
+import type {
+  CheckoutInput,
+  CheckoutResult,
+  OrderListItem,
+  OrderTrackQuery,
+  OrderView,
+} from '@repo/contracts';
 import { apiFetch } from '../api-client';
 import { cartIdentityHeaders } from '../cart-headers';
 
 export const ordersApi = {
   checkout: (input: CheckoutInput) =>
-    apiFetch<OrderView>('/orders', { body: input, headers: cartIdentityHeaders() }),
+    apiFetch<CheckoutResult>('/orders', { body: input, headers: cartIdentityHeaders() }),
 
   track: (query: OrderTrackQuery) =>
     apiFetch<OrderView>(

@@ -7,10 +7,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 DauTayToy Store — an e-commerce platform for a children's toy store, built as a long-term
 system (web + API meant to also serve a future mobile app), not a simple storefront. Phase 2
 (customer-facing catalog/cart/checkout/wishlist/profile/blog/etc.) and Phase 3 (full admin panel
-— see below) are both built. Phase 4+ (a shared promotion/pricing engine to wire the remaining
-marketing entities into checkout, a real payment gateway, AI modules) are planned but not built.
-See `docs/architecture.md` for the full log of architecture decisions and their rationale, and
-`docs/ERD.md` for the database diagram.
+— see below) are both built. Phase 4 (permission-level RBAC, real outbound email, the shared
+promotion/pricing engine wiring FlashSale/ComboDeal/BuyXGetYRule/FreeShippingRule/GiftVoucher into
+checkout, and a first real payment gateway — VNPay, sandbox-only so far) is also built. Still
+planned but not built: MoMo/Stripe as additional payment gateways, and AI modules (image
+compression/background removal). See `docs/architecture.md` for the full log of architecture
+decisions and their rationale, and `docs/ERD.md` for the database diagram.
 
 ## Commands
 
@@ -107,19 +109,35 @@ response itself.
 **Checkout/orders**: `Order` snapshots the shipping address onto its own columns rather than
 only referencing `Address` (which requires a `userId`), since checkout must work for guests.
 Inventory reservation (`Inventory.quantityReserved`) happens at checkout time in the same
-transaction as order creation, not at payment confirmation — there's no real payment gateway yet
-(COD only). `AdminOrdersService.updateStatus` enforces an explicit state machine and releases
-inventory correctly: moving to `CANCELLED` decrements only `quantityReserved` (stock never left
-the warehouse), moving to `SHIPPED` decrements both `quantityOnHand` and `quantityReserved`
-(stock physically left) — the Phase 2 reservation-release gap is closed. Shipping fee is not a
+transaction as order creation, not at payment confirmation — this holds even for VNPay checkouts
+(see **Payments** below), where confirmation only arrives after the customer leaves and returns.
+`AdminOrdersService.updateStatus` enforces an explicit state machine and releases inventory
+correctly: moving to `CANCELLED` decrements only `quantityReserved` (stock never left the
+warehouse), moving to `SHIPPED` decrements both `quantityOnHand` and `quantityReserved` (stock
+physically left) — the Phase 2 reservation-release gap is closed. Shipping fee is not a
 hardcoded constant: `OrdersService.checkout` reads `freeShippingThreshold`/`flatShippingFee` live
 from `SettingsModule` (`modules/settings/`, a `@Global()` module storing one `SiteSettings` JSON
 blob under `Setting.key = 'site'`), so an admin editing `/admin/settings` changes checkout
-behavior with no redeploy. Order confirmation is passed to the frontend directly in the checkout
-response and stashed in `sessionStorage` for `/order-confirmation/[orderNumber]` rather than
-refetched, to avoid exposing the guest's email via URL query params; a reloaded/fresh
-confirmation page degrades to pointing at `/order-tracking` (which does need the email, since
-that's an intentional cross-session lookup).
+behavior with no redeploy. For COD, order confirmation is passed to the frontend directly in the
+checkout response and stashed in `sessionStorage` for `/order-confirmation/[orderNumber]` rather
+than refetched, to avoid exposing the guest's email via URL query params; a reloaded/fresh
+confirmation page (also the normal path after a VNPay redirect, since the browser leaves the SPA
+entirely) degrades to pointing at `/order-tracking` (which does need the email, since that's an
+intentional cross-session lookup).
+
+**Payments** (`modules/payments/`): `checkoutSchema.paymentMethod` (`'COD' | 'VNPAY'`, default
+`'COD'`) branches `OrdersService.checkout` — COD is unchanged; VNPay additionally returns a
+`paymentUrl` the frontend redirects the browser to. VNPay confirms payment through two channels
+that can race (the browser's return redirect and VNPay's own server-to-server IPN), so
+`PaymentsService.confirmVnpayPayment` uses an atomic `updateMany({ where: { status: 'PENDING' } })`
+compare-and-swap as the idempotency boundary — never a `findUnique`-then-branch — so whichever
+channel arrives first wins and the other safely no-ops. Every outcome (success, failure, amount
+mismatch, already-processed) is recorded as an `OrderStatusHistory` note, including the case where
+payment succeeds after an order was already moved on from (e.g. admin-cancelled while payment was
+in flight) — flagged loudly since there's no automatic VNPay refund call yet, only a manual
+merchant-portal process. See `docs/architecture.md`'s "Phase 4+ — VNPay payment gateway" section
+for the signature-encoding gotcha (VNPay's `+`-for-space convention, not plain
+`encodeURIComponent`) and the full out-of-scope list (MoMo/Stripe, admin refund UI, payment retry).
 
 **Admin panel** (`apps/api/src/modules/<domain>` — controllers/services prefixed `Admin*`;
 `apps/web/app/admin/*`): every admin controller is class-decorated with `@Roles(...)` (STAFF
@@ -202,6 +220,11 @@ integer math — no cents/decimal handling anywhere. Frontend formats via
   failing the job (see the Background jobs paragraph above).
 - **Change the seeded admin password** (`admin@dautaytoystore.vn` / `Admin@123456`) before
   seeding any shared/production environment.
+- **Register a VNPay sandbox merchant account and set `VNPAY_TMN_CODE`/`VNPAY_HASH_SECRET`/
+  `VNPAY_RETURN_URL` on the Render deploy** (register at sandbox.vnpayment.vn/devreg — see
+  `docs/deployment.md`), then separately register the IPN URL
+  (`<API public URL>/api/payments/vnpay/ipn`) inside the VNPay merchant dashboard itself. Until
+  then, COD checkout is unaffected but choosing VNPay at checkout fails with a clear error.
 - After fixing the above and actually deploying, **update this file's "Project" section and this
   TODO list** to reflect the new state (remove fixed items, note the live deploy URLs/setup if
   relevant) — don't leave stale TODOs here once they're done.

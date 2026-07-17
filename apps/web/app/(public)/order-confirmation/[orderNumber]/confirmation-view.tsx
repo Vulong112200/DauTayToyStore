@@ -2,14 +2,40 @@
 
 import * as React from 'react';
 import Link from 'next/link';
-import { CheckCircle2 } from 'lucide-react';
+import { useSearchParams } from 'next/navigation';
+import { CheckCircle2, XCircle } from 'lucide-react';
 import type { OrderView } from '@repo/contracts';
 import { Button } from '@/components/ui/button';
 import { formatVnd } from '@/lib/utils';
 
 const LAST_ORDER_STORAGE_KEY = 'dautaytoy-last-order';
 
+const PAYMENT_STATUS_BANNER = {
+  success: {
+    icon: CheckCircle2,
+    className: 'text-green-600',
+    message: 'Thanh toán VNPay thành công!',
+  },
+  failed: {
+    icon: XCircle,
+    className: 'text-destructive',
+    message: 'Thanh toán VNPay thất bại hoặc đã bị huỷ. Vui lòng thử lại hoặc chọn COD.',
+  },
+  invalid: {
+    icon: XCircle,
+    className: 'text-destructive',
+    message: 'Không thể xác thực kết quả thanh toán. Vui lòng tra cứu đơn hàng để kiểm tra.',
+  },
+} as const;
+
 export function OrderConfirmationView({ orderNumber }: { orderNumber: string }) {
+  const searchParams = useSearchParams();
+  const paymentStatus = searchParams.get('paymentStatus');
+  const banner =
+    paymentStatus && paymentStatus in PAYMENT_STATUS_BANNER
+      ? PAYMENT_STATUS_BANNER[paymentStatus as keyof typeof PAYMENT_STATUS_BANNER]
+      : null;
+
   const [order, setOrder] = React.useState<OrderView | null | undefined>(undefined);
 
   React.useEffect(() => {
@@ -33,7 +59,14 @@ export function OrderConfirmationView({ orderNumber }: { orderNumber: string }) 
   if (order === null) {
     return (
       <div className="flex flex-col items-center gap-4 py-16 text-center">
-        <p className="text-lg font-medium">Không tìm thấy thông tin đơn hàng trong phiên này</p>
+        {banner ? (
+          <>
+            <banner.icon className={`h-14 w-14 ${banner.className}`} aria-hidden />
+            <p className={`text-lg font-medium ${banner.className}`}>{banner.message}</p>
+          </>
+        ) : (
+          <p className="text-lg font-medium">Không tìm thấy thông tin đơn hàng trong phiên này</p>
+        )}
         <p className="max-w-md text-sm text-muted-foreground">
           Mã đơn hàng của bạn là <strong>{orderNumber}</strong>. Vui lòng dùng trang Tra cứu đơn
           hàng để xem chi tiết.

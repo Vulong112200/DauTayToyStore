@@ -34,6 +34,12 @@ export function buildConfiguration(env: EnvConfig) {
       resendApiKey: env.RESEND_API_KEY,
       from: env.EMAIL_FROM,
     },
+    vnpay: {
+      tmnCode: env.VNPAY_TMN_CODE,
+      hashSecret: env.VNPAY_HASH_SECRET,
+      paymentUrl: env.VNPAY_PAYMENT_URL,
+      returnUrl: env.VNPAY_RETURN_URL,
+    },
     throttle: {
       ttlMs: env.THROTTLE_TTL_MS,
       limit: env.THROTTLE_LIMIT,

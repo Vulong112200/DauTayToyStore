@@ -1,6 +1,6 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
-import type { CheckoutInput, OrderListItem, OrderView } from '@repo/contracts';
+import type { CheckoutInput, CheckoutResult, OrderListItem, OrderView } from '@repo/contracts';
 import { CartIdentity } from '../../common/cart-identity/cart-identity';
 import { PromotionContextService } from '../../common/promotion-context/promotion-context.service';
 import {
@@ -12,6 +12,7 @@ import { assertVoucherUsable, computeVoucherDiscount } from '../../common/utils/
 import { resolveAvailableStock } from '../../common/utils/inventory.util';
 import { resolveFreeShipping, runPromotionEngine } from '../../common/utils/promotion-engine.util';
 import { PrismaService } from '../../infra/prisma/prisma.service';
+import { VnpayService } from '../payments/vnpay.service';
 import { AdminSettingsService } from '../settings/admin-settings.service';
 import { ORDER_VIEW_INCLUDE, toOrderView } from './order-view.util';
 import { generateOrderNumber } from './utils/order-number.util';
@@ -44,9 +45,14 @@ export class OrdersService {
     private readonly prisma: PrismaService,
     private readonly adminSettingsService: AdminSettingsService,
     private readonly promotionContext: PromotionContextService,
+    private readonly vnpayService: VnpayService,
   ) {}
 
-  async checkout(identity: CartIdentity, input: CheckoutInput): Promise<OrderView> {
+  async checkout(
+    identity: CartIdentity,
+    input: CheckoutInput,
+    ipAddr = '127.0.0.1',
+  ): Promise<CheckoutResult> {
     const cart = await this.prisma.cart.findFirst({
       where: identity.userId ? { userId: identity.userId } : { sessionId: identity.sessionId },
       include: { items: { include: CART_ITEM_INCLUDE }, coupon: true, voucher: true },
@@ -222,7 +228,7 @@ export class OrdersService {
           note: input.note,
           items: { create: lines },
           statusHistory: { create: [{ status: 'PENDING', note: 'Đơn hàng đã được tạo' }] },
-          payment: { create: { method: 'COD', status: 'PENDING', amount: total } },
+          payment: { create: { method: input.paymentMethod, status: 'PENDING', amount: total } },
         },
         include: ORDER_VIEW_INCLUDE,
       });
@@ -254,7 +260,12 @@ export class OrdersService {
       return created;
     });
 
-    return toOrderView(order);
+    const paymentUrl =
+      input.paymentMethod === 'VNPAY'
+        ? this.vnpayService.buildPaymentUrl({ orderNumber: order.orderNumber, amount: total, ipAddr })
+        : null;
+
+    return { order: toOrderView(order), paymentUrl };
   }
 
   async listForUser(userId: string): Promise<OrderListItem[]> {

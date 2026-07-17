@@ -30,6 +30,14 @@ export const envSchema = z.object({
   RESEND_API_KEY: z.string().optional().default(''),
   EMAIL_FROM: z.string().optional().default(''),
 
+  VNPAY_TMN_CODE: z.string().optional().default(''),
+  VNPAY_HASH_SECRET: z.string().optional().default(''),
+  VNPAY_PAYMENT_URL: z
+    .string()
+    .optional()
+    .default('https://sandbox.vnpayment.vn/paymentv2/vpcpay.html'),
+  VNPAY_RETURN_URL: z.string().optional().default(''),
+
   THROTTLE_TTL_MS: z.coerce.number().int().positive().default(60000),
   THROTTLE_LIMIT: z.coerce.number().int().positive().default(100),
 });

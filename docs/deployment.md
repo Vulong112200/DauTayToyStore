@@ -25,6 +25,13 @@ Kiểm tra bạn đã có sẵn (nếu chưa, xem `docs/architecture.md` phần 
 - [ ] Resend API key (tuỳ chọn — nếu muốn email quên mật khẩu thực sự gửi được) — tạo tại
   [resend.com/api-keys](https://resend.com/api-keys), điền `RESEND_API_KEY`/`EMAIL_FROM`. Để trống
   vẫn deploy được bình thường, chỉ là email sẽ không gửi thật (chỉ log cảnh báo)
+- [ ] VNPay sandbox/merchant credentials (tuỳ chọn — nếu muốn checkout bằng VNPay hoạt động
+  thật) — đăng ký tại [sandbox.vnpayment.vn/devreg](https://sandbox.vnpayment.vn/devreg/), điền
+  `VNPAY_TMN_CODE`/`VNPAY_HASH_SECRET`. `VNPAY_RETURN_URL` phải là URL public của chính API này
+  (không phải frontend) + `/api/payments/vnpay/return`. Để trống vẫn deploy được bình thường,
+  COD checkout không bị ảnh hưởng — chỉ riêng việc chọn VNPay lúc checkout sẽ báo lỗi rõ ràng.
+  Sau khi có credentials, còn cần đăng ký thêm URL IPN (`<API public URL>/api/payments/vnpay/ipn`)
+  trong dashboard merchant của VNPay — bước này không thể làm qua biến môi trường
 - [ ] Google OAuth Client ID/Secret (nếu dùng đăng nhập Google) — từ Google Cloud Console
 - [ ] 2 chuỗi bí mật JWT ngẫu nhiên, tối thiểu 32 ký tự mỗi chuỗi (`JWT_ACCESS_SECRET`, `JWT_REFRESH_SECRET`). Tạo nhanh:
   ```bash
@@ -102,6 +109,13 @@ R2_PUBLIC_URL=https://pub-xxxxxxxxxxxx.r2.dev
 # email quên mật khẩu sẽ không thực sự được gửi (chỉ log cảnh báo)
 RESEND_API_KEY=<api key lấy từ resend.com/api-keys>
 EMAIL_FROM=DauTayToy Store <no-reply@your-domain.com>
+
+# VNPay payment gateway — tuỳ chọn, để trống thì COD checkout vẫn chạy bình thường,
+# chỉ riêng việc chọn VNPay lúc checkout sẽ báo lỗi rõ ràng thay vì gửi thất bại âm thầm
+VNPAY_TMN_CODE=<TMN code lấy từ sandbox.vnpayment.vn/devreg>
+VNPAY_HASH_SECRET=<hash secret lấy từ sandbox.vnpayment.vn/devreg>
+VNPAY_PAYMENT_URL=https://sandbox.vnpayment.vn/paymentv2/vpcpay.html
+VNPAY_RETURN_URL=https://dautaytoy-api.onrender.com/api/payments/vnpay/return
 
 # Rate limiting (tuỳ chọn, có default hợp lý)
 THROTTLE_TTL_MS=60000

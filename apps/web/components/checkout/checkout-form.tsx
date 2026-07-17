@@ -27,14 +27,21 @@ export function CheckoutForm() {
     register,
     handleSubmit,
     formState: { errors },
-  } = useForm<CheckoutInput>({ resolver: zodResolver(checkoutSchema) });
+  } = useForm<CheckoutInput>({
+    resolver: zodResolver(checkoutSchema),
+    defaultValues: { paymentMethod: 'COD' },
+  });
 
   const onSubmit = handleSubmit(async (values) => {
     setServerError(null);
     try {
-      const order = await checkout.mutateAsync(values);
-      window.sessionStorage.setItem(LAST_ORDER_STORAGE_KEY, JSON.stringify(order));
-      router.push(`/order-confirmation/${order.orderNumber}`);
+      const result = await checkout.mutateAsync(values);
+      if (result.paymentUrl) {
+        window.location.href = result.paymentUrl;
+        return;
+      }
+      window.sessionStorage.setItem(LAST_ORDER_STORAGE_KEY, JSON.stringify(result.order));
+      router.push(`/order-confirmation/${result.order.orderNumber}`);
     } catch (error) {
       setServerError(error instanceof ApiError ? error.message : 'Không thể đặt hàng, vui lòng thử lại');
     }
@@ -145,9 +152,16 @@ export function CheckoutForm() {
 
         <div className="rounded-2xl bg-muted/50 p-4 text-sm">
           <p className="font-semibold">Phương thức thanh toán</p>
-          <p className="mt-1 text-muted-foreground">
-            Thanh toán khi nhận hàng (COD) — hiện là phương thức duy nhất được hỗ trợ.
-          </p>
+          <div className="mt-2 space-y-2">
+            <label className="flex items-center gap-2">
+              <input type="radio" value="COD" {...register('paymentMethod')} />
+              Thanh toán khi nhận hàng (COD)
+            </label>
+            <label className="flex items-center gap-2">
+              <input type="radio" value="VNPAY" {...register('paymentMethod')} />
+              Thanh toán qua VNPay (ATM/thẻ nội địa, Visa/Master/JCB, QR)
+            </label>
+          </div>
         </div>
 
         <Button type="submit" size="lg" className="w-full" disabled={checkout.isPending}>

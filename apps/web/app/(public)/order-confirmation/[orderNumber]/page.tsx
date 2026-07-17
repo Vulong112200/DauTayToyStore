@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { Suspense } from 'react';
 import { OrderConfirmationView } from './confirmation-view';
 
 export const metadata: Metadata = {
@@ -15,7 +16,9 @@ export default async function OrderConfirmationPage({
 
   return (
     <section className="container py-12">
-      <OrderConfirmationView orderNumber={orderNumber} />
+      <Suspense fallback={<p className="text-muted-foreground">Đang tải...</p>}>
+        <OrderConfirmationView orderNumber={orderNumber} />
+      </Suspense>
     </section>
   );
 }
