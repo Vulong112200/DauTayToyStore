@@ -46,8 +46,15 @@ async function runRefresh(): Promise<boolean> {
       cache: 'no-store',
     });
     if (!response.ok) {
-      // Refresh token itself is invalid/revoked/expired — force a clean re-login.
-      useAuthStore.getState().clearSession();
+      // Only a definitive auth rejection (invalid/revoked/expired refresh token)
+      // should destroy the session. A transient non-2xx — e.g. the free-tier API
+      // cold-starting and briefly returning 502/503 — must NOT log the user out,
+      // or an admin mid-edit gets silently redirected to /login and loses unsaved
+      // work. Leave the session intact and return false; the original request
+      // surfaces its own error and can simply be retried once the API is awake.
+      if (response.status === 401 || response.status === 403) {
+        useAuthStore.getState().clearSession();
+      }
       return false;
     }
     const data = (await response.json()) as AuthResponse;

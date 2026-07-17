@@ -9,6 +9,8 @@ interface AuthState {
   clearSession: () => void;
 }
 
+const AUTH_STORAGE_KEY = 'dautaytoy-auth';
+
 export const useAuthStore = create<AuthState>()(
   persist(
     (set) => ({
@@ -18,8 +20,23 @@ export const useAuthStore = create<AuthState>()(
       clearSession: () => set({ user: null, tokens: null }),
     }),
     {
-      name: 'dautaytoy-auth',
+      name: AUTH_STORAGE_KEY,
       storage: createJSONStorage(() => localStorage),
     },
   ),
 );
+
+// Cross-tab sync: refresh tokens rotate on every use (the old one is revoked
+// server-side), but zustand's persist only reads localStorage once at load — so
+// a second tab keeps a stale, already-revoked refresh token in memory. When it
+// later tries to refresh, the server 401s and the tab gets logged out mid-edit.
+// Re-reading localStorage on the browser's `storage` event (which fires only in
+// *other* tabs) keeps every tab's in-memory session current with whichever tab
+// last refreshed, logged in, or logged out.
+if (typeof window !== 'undefined') {
+  window.addEventListener('storage', (event) => {
+    if (event.key === AUTH_STORAGE_KEY || event.key === null) {
+      void useAuthStore.persist.rehydrate();
+    }
+  });
+}
