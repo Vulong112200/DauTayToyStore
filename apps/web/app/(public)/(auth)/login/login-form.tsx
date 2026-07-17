@@ -10,6 +10,7 @@ import { FormError } from '@/components/auth/form-error';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { PasswordInput } from '@/components/ui/password-input';
 import { CART_QUERY_KEY } from '@/hooks/use-cart';
 import { ApiError } from '@/lib/api-client';
 import { authApi } from '@/lib/api/auth';
@@ -70,9 +71,8 @@ export function LoginForm() {
             Quên mật khẩu?
           </a>
         </div>
-        <Input
+        <PasswordInput
           id="password"
-          type="password"
           autoComplete="current-password"
           aria-invalid={!!errors.password}
           {...register('password')}

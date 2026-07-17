@@ -7,6 +7,7 @@ import { FormError } from '@/components/auth/form-error';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { PasswordInput } from '@/components/ui/password-input';
 
 const ROLE_OPTIONS: { value: RoleName; label: string }[] = [
   { value: RoleName.SUPER_ADMIN, label: 'Super Admin' },
@@ -61,12 +62,7 @@ export function UserCreateForm({
         </div>
         <div className="space-y-1.5">
           <Label htmlFor="password">Mật khẩu</Label>
-          <Input
-            id="password"
-            type="password"
-            aria-invalid={!!errors.password}
-            {...register('password')}
-          />
+          <PasswordInput id="password" aria-invalid={!!errors.password} {...register('password')} />
           {errors.password && (
             <p className="text-xs text-destructive">{errors.password.message}</p>
           )}

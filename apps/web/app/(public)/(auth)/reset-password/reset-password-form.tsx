@@ -7,8 +7,8 @@ import { useForm } from 'react-hook-form';
 import { type ResetPasswordInput, resetPasswordSchema } from '@repo/contracts';
 import { FormError } from '@/components/auth/form-error';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { PasswordInput } from '@/components/ui/password-input';
 import { ApiError } from '@/lib/api-client';
 import { authApi } from '@/lib/api/auth';
 
@@ -67,9 +67,8 @@ export function ResetPasswordForm() {
 
       <div className="space-y-1.5">
         <Label htmlFor="password">Mật khẩu mới</Label>
-        <Input
+        <PasswordInput
           id="password"
-          type="password"
           autoComplete="new-password"
           aria-invalid={!!errors.password}
           {...register('password')}
