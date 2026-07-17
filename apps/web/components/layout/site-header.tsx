@@ -1,6 +1,7 @@
 'use client';
 
 import * as React from 'react';
+import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Heart, Menu, Search, ShoppingCart, User, X } from 'lucide-react';
@@ -40,8 +41,16 @@ export function SiteHeader() {
   return (
     <header className="sticky top-0 z-50 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80">
       <div className="container flex h-16 items-center justify-between gap-4">
-        <Link href="/" className="font-display text-xl font-extrabold text-primary">
-          🧸 DauTayToy
+        <Link href="/" className="flex items-center gap-2 font-display text-xl font-extrabold text-primary">
+          <Image
+            src="/logo.jpg"
+            alt="Dâu Tây Toys"
+            width={40}
+            height={40}
+            className="rounded-full"
+            priority
+          />
+          Dâu Tây Toys
         </Link>
 
         <nav className="hidden items-center gap-6 lg:flex" aria-label="Điều hướng chính">

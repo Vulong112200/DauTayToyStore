@@ -1,5 +1,6 @@
 'use client';
 
+import Image from 'next/image';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
 import { ArrowRight } from 'lucide-react';
@@ -46,8 +47,15 @@ export function HeroSection() {
           transition={{ duration: 0.6, delay: 0.1, ease: 'easeOut' }}
           className="relative flex items-center justify-center"
         >
-          <div className="animate-bounce-soft rounded-[2.5rem] bg-card p-10 text-8xl shadow-lg">
-            🧸
+          <div className="relative aspect-[960/536] w-full max-w-xl overflow-hidden rounded-[2.5rem] shadow-lg">
+            <Image
+              src="/hero-banner.jpg"
+              alt="Dâu Tây Toys - Nơi trí tưởng tượng bay xa"
+              fill
+              sizes="(min-width: 1024px) 50vw, 100vw"
+              className="object-cover"
+              priority
+            />
           </div>
         </motion.div>
       </div>
