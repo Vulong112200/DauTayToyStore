@@ -16,8 +16,14 @@ export async function FeaturedProducts() {
         </Link>
       </div>
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        {items.map((product) => (
-          <ProductCard key={product.id} product={product} />
+        {items.map((product, index) => (
+          <div
+            key={product.id}
+            className="animate-fade-up opacity-0"
+            style={{ animationDelay: `${index * 60}ms`, animationFillMode: 'forwards' }}
+          >
+            <ProductCard product={product} />
+          </div>
         ))}
       </div>
     </section>

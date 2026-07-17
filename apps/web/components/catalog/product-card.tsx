@@ -8,15 +8,18 @@ import { formatVnd } from '@/lib/utils';
 
 export function ProductCard({ product }: { product: ProductListItem }) {
   return (
-    <Card className="flex h-full flex-col overflow-hidden">
-      <Link href={`/products/${product.slug}`} className="relative block aspect-square bg-muted">
+    <Card className="group flex h-full flex-col overflow-hidden transition-all duration-300 hover:-translate-y-1 hover:shadow-md">
+      <Link
+        href={`/products/${product.slug}`}
+        className="relative block aspect-square overflow-hidden bg-muted"
+      >
         {product.primaryImageUrl ? (
           <Image
             src={product.primaryImageUrl}
             alt={product.name}
             fill
             sizes="(max-width: 768px) 50vw, 25vw"
-            className="object-cover"
+            className="object-cover transition-transform duration-300 group-hover:scale-105"
           />
         ) : (
           <div className="flex h-full items-center justify-center text-4xl" aria-hidden>
