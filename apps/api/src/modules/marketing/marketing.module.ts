@@ -7,6 +7,8 @@ import { AdminCouponsController } from './coupons/admin-coupons.controller';
 import { AdminCouponsService } from './coupons/admin-coupons.service';
 import { AdminFlashSalesController } from './flash-sales/admin-flash-sales.controller';
 import { AdminFlashSalesService } from './flash-sales/admin-flash-sales.service';
+import { FlashSalesController } from './flash-sales/flash-sales.controller';
+import { FlashSalesService } from './flash-sales/flash-sales.service';
 import { AdminFreeShippingRulesController } from './free-shipping-rules/admin-free-shipping-rules.controller';
 import { AdminFreeShippingRulesService } from './free-shipping-rules/admin-free-shipping-rules.service';
 import { AdminGiftVouchersController } from './gift-vouchers/admin-gift-vouchers.controller';
@@ -16,6 +18,7 @@ import { AdminGiftVouchersService } from './gift-vouchers/admin-gift-vouchers.se
   controllers: [
     AdminCouponsController,
     AdminFlashSalesController,
+    FlashSalesController,
     AdminGiftVouchersController,
     AdminComboDealsController,
     AdminBuyXGetYRulesController,
@@ -24,6 +27,7 @@ import { AdminGiftVouchersService } from './gift-vouchers/admin-gift-vouchers.se
   providers: [
     AdminCouponsService,
     AdminFlashSalesService,
+    FlashSalesService,
     AdminGiftVouchersService,
     AdminComboDealsService,
     AdminBuyXGetYRulesService,

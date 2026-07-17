@@ -17,6 +17,7 @@ const NAV_LINKS = [
   { href: '/', label: 'Trang chủ' },
   { href: '/categories', label: 'Danh mục' },
   { href: '/products', label: 'Sản phẩm' },
+  { href: '/flash-sales', label: 'Flash Sale' },
   { href: '/blog', label: 'Blog' },
   { href: '/faq', label: 'Hỏi đáp' },
   { href: '/about', label: 'Giới thiệu' },
