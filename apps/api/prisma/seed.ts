@@ -877,12 +877,75 @@ async function seedContent() {
   });
 }
 
+// Maps each product/blog slug to a real demo image bundled in the web app's
+// public/ folder (served by Next.js at `/demo/...`). Kept separate from the
+// product/blog `create` blocks above because those upsert with `update: {}` —
+// a no-op on rows that already exist — so this reconcile pass is what actually
+// (re)applies images on every seed run, to both new and pre-existing rows.
+const PRODUCT_IMAGES: Record<string, string> = {
+  'lego-city-xe-cuu-hoa': '/demo/lego-fire-truck.jpg',
+  'lego-friends-heartlake-city': '/demo/lego-friends.jpg',
+  'lego-technic-xe-dua-the-thao': '/demo/lego-technic.jpg',
+  'gau-bong-teddy-classic-40cm': '/demo/teddy-bear.jpg',
+  'cun-bong-corgi-om-goi': '/demo/plush-dog.jpg',
+  'tho-bong-bunny-pastel-35cm': '/demo/plush-rabbit.jpg',
+  'bo-xep-hinh-stem-robot-lap-trinh': '/demo/toy-robot.jpg',
+  'kinh-hien-vi-khoa-hoc-cho-be': '/demo/microscope.jpg',
+  'bo-thi-nghiem-hoa-hoc-vui': '/demo/chemistry-set.jpg',
+  'xe-dua-hot-wheels-track-builder': '/demo/toy-car-track.jpg',
+  'mo-hinh-xe-cuu-hoa-dieu-khien-tu-xa': '/demo/toy-fire-truck.jpg',
+  'bo-suu-tap-xe-mo-hinh-5-chiec': '/demo/diecast-cars.jpg',
+  'bup-be-barbie-dreamhouse': '/demo/dollhouse.jpg',
+  'bup-be-barbie-fashionista': '/demo/fashion-doll.jpg',
+  'bo-phu-kien-xe-hoi-cho-bup-be': '/demo/toy-convertible.jpg',
+  'cau-truot-lien-xich-du-mini': '/demo/playground-slide.jpg',
+  'xe-choi-chan-cho-be': '/demo/ride-on-toy.jpg',
+  'be-bong-vui-nhon-100-bong': '/demo/ball-pit.jpg',
+  'dan-piano-cho-be-tap-choi': '/demo/toy-piano.jpg',
+  'trong-luc-lac-am-nhac-vui-nhon': '/demo/toy-drum.jpg',
+  'micro-karaoke-mini-cho-be': '/demo/toy-microphone.jpg',
+  'co-vua-go-cao-cap-cho-be': '/demo/chess-wooden.jpg',
+  'bo-xep-hinh-100-manh-dong-vat': '/demo/jigsaw-puzzle.jpg',
+  'tro-choi-tri-nho-memory-match': '/demo/memory-game.jpg',
+  'bo-do-choi-nha-bep-mini': '/demo/toy-kitchen.jpg',
+  'bo-dung-cu-bac-si-cho-be': '/demo/doctor-kit.jpg',
+  'bo-do-choi-lam-banh-mini': '/demo/play-food.jpg',
+};
+
+const BLOG_COVERS: Record<string, string> = {
+  'cach-chon-do-choi-phu-hop-theo-do-tuoi': '/demo/blog/choose-toys.jpg',
+  'loi-ich-cua-do-choi-lap-rap-voi-tre-em': '/demo/blog/lego-bricks.jpg',
+};
+
+async function seedDemoImages() {
+  for (const [slug, url] of Object.entries(PRODUCT_IMAGES)) {
+    const product = await prisma.product.findUnique({ where: { slug } });
+    if (!product) continue;
+    // Replace all images so this is idempotent regardless of prior state.
+    await prisma.productImage.deleteMany({ where: { productId: product.id } });
+    await prisma.productImage.create({
+      data: {
+        productId: product.id,
+        url,
+        altText: product.name,
+        isPrimary: true,
+        sortOrder: 0,
+      },
+    });
+  }
+
+  for (const [slug, coverImageUrl] of Object.entries(BLOG_COVERS)) {
+    await prisma.blogPost.updateMany({ where: { slug }, data: { coverImageUrl } });
+  }
+}
+
 async function main() {
   await seedRolesAndPermissions();
   await seedAdminUser();
   await seedCatalog();
   await seedDemoCatalog();
   await seedContent();
+  await seedDemoImages();
 }
 
 main()
