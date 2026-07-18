@@ -43,7 +43,9 @@ describe('CartService', () => {
       giftVoucher: { findUnique: jest.fn() },
       order: { count: jest.fn() },
       cart: {
-        upsert: jest.fn().mockResolvedValue(cart),
+        // getOrCreateCart now includes coupon+voucher and hands the row straight to
+        // loadCartView (no second findUniqueOrThrow), so the refs live on the upsert result.
+        upsert: jest.fn().mockResolvedValue({ ...cart, coupon: null, voucher: null }),
         update: jest.fn(),
         findUniqueOrThrow: jest.fn().mockResolvedValue({ ...cart, coupon: null, voucher: null }),
         findUnique: jest.fn(),
@@ -392,7 +394,7 @@ describe('CartService', () => {
 
     it('caps the voucher discount at the remaining balance and deducts it from the total', async () => {
       prisma.cartItem.findMany.mockResolvedValue([cartItemRow()]);
-      prisma.cart.findUniqueOrThrow.mockResolvedValue({
+      prisma.cart.upsert.mockResolvedValue({
         ...cart,
         coupon: null,
         voucher: { id: 'v1', code: 'GIFT10', isActive: true, expiresAt: null, balance: 30_000 },

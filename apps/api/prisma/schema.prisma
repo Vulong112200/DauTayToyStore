@@ -784,6 +784,10 @@ model FlashSaleItem {
   product   Product   @relation(fields: [productId], references: [id], onDelete: Cascade)
 
   @@unique([flashSaleId, productId])
+  // The composite above leads with flashSaleId, so it can't serve the productId-IN
+  // lookup that PromotionContextService.loadFlashSaleItems runs on every cart AND
+  // wishlist read. Add a standalone productId index for that hot path.
+  @@index([productId])
   @@map("flash_sale_items")
 }
 
@@ -800,6 +804,8 @@ model ComboDeal {
 
   items ComboItem[]
 
+  // Every cart read filters combos by isActive (+ date window); index it.
+  @@index([isActive])
   @@map("combo_deals")
 }
 
@@ -829,6 +835,8 @@ model BuyXGetYRule {
   endsAt          DateTime?
   createdAt       DateTime  @default(now())
 
+  // Every cart read filters BOGO rules by isActive (+ date window); index it.
+  @@index([isActive])
   @@map("buy_x_get_y_rules")
 }
 
@@ -842,6 +850,8 @@ model FreeShippingRule {
   endsAt              DateTime?
   createdAt           DateTime  @default(now())
 
+  // Checkout filters free-shipping rules by isActive (+ date window); index it.
+  @@index([isActive])
   @@map("free_shipping_rules")
 }
 

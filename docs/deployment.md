@@ -99,7 +99,17 @@ PORT=4000                          # Render tự inject PORT riêng, biến này
 API_PREFIX=api
 
 # Supabase — pooled connection cho app chạy (port 6543, PgBouncer transaction mode)
-DATABASE_URL=postgresql://postgres.<project-ref>:<password>@aws-1-ap-south-1.pooler.supabase.com:6543/postgres?pgbouncer=true&connection_limit=1
+# QUAN TRỌNG (hiệu năng):
+#  - connection_limit=5 (KHÔNG để 1). Đây là kích thước pool của chính Prisma tới pooler.
+#    Với 1 container Render chạy dài hạn, để 1 khiến MỌI query của MỌI request nối đuôi
+#    qua đúng 1 kết nối — trang vừa load bắn song song cart+wishlist+profile+orders sẽ
+#    chạy tuần tự thay vì song song. Đặt 5 (có thể tới ~10). (1 chỉ hợp lý cho serverless.)
+#  - REGION: đặt Supabase project CÙNG region với Render (mục 1.1 khuyến nghị Singapore).
+#    Nếu lệch (vd Render ở Singapore nhưng host dưới là aws-1-ap-south-1 = Mumbai), mỗi
+#    round-trip DB cộng thêm ~60-90ms, và mỗi request có nhiều round-trip → chậm rõ rệt.
+#    Supabase không đổi region tại chỗ được; nếu sai phải tạo project mới đúng region rồi
+#    migrate dữ liệu. Host pooler nên khớp region đã chọn (vd aws-...-ap-southeast-1 cho Singapore).
+DATABASE_URL=postgresql://postgres.<project-ref>:<password>@aws-1-ap-southeast-1.pooler.supabase.com:6543/postgres?pgbouncer=true&connection_limit=5
 
 # Supabase — direct connection, chỉ Prisma migrate dùng (port 5432)
 DIRECT_URL=postgresql://postgres:<password>@db.<project-ref>.supabase.co:5432/postgres

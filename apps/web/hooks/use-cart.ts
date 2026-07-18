@@ -9,11 +9,17 @@ import type {
   UpdateCartItemInput,
 } from '@repo/contracts';
 import { cartApi } from '@/lib/api/cart';
+import { useAuthReady } from './use-auth-ready';
 
 export const CART_QUERY_KEY = ['cart'] as const;
 
+// Gate on auth-ready so a logged-in user whose access token expired sends a freshly
+// refreshed Bearer (cartIdentityHeaders reads the token at call time) instead of an
+// expired one that would silently fall back to the guest x-cart-session identity and
+// return the wrong/empty cart. Guests become ready as soon as hydration finishes.
 export function useCart() {
-  return useQuery({ queryKey: CART_QUERY_KEY, queryFn: cartApi.get });
+  const authReady = useAuthReady();
+  return useQuery({ queryKey: CART_QUERY_KEY, queryFn: cartApi.get, enabled: authReady });
 }
 
 export function useAddToCart() {

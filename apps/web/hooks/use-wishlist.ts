@@ -3,6 +3,7 @@
 import { useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import type { ProductListItem, WishlistView } from '@repo/contracts';
 import { wishlistApi } from '@/lib/api/wishlist';
+import { useAuthReady } from './use-auth-ready';
 
 export const WISHLIST_QUERY_KEY = ['wishlist'] as const;
 
@@ -16,10 +17,11 @@ function rollbackWishlist(queryClient: QueryClient, context: { previous?: Wishli
 }
 
 export function useWishlist(enabled: boolean) {
+  const authReady = useAuthReady();
   return useQuery({
     queryKey: WISHLIST_QUERY_KEY,
     queryFn: wishlistApi.get,
-    enabled,
+    enabled: enabled && authReady,
   });
 }
 
@@ -28,10 +30,11 @@ export function useWishlist(enabled: boolean) {
 // the grid (TanStack Query re-renders a subscriber only when its *selected* value
 // changes, and does the O(items) scan against the cached list, never a refetch).
 export function useIsInWishlist(productId: string, enabled: boolean) {
+  const authReady = useAuthReady();
   return useQuery({
     queryKey: WISHLIST_QUERY_KEY,
     queryFn: wishlistApi.get,
-    enabled,
+    enabled: enabled && authReady,
     select: (data) => data.items.some((item) => item.productId === productId),
   });
 }

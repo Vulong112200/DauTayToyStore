@@ -1,7 +1,13 @@
 import type { AuthResponse } from '@repo/contracts';
 import { useAuthStore } from '@/store/auth-store';
 import { env } from './env';
+import { isAccessTokenFresh } from './jwt';
 import { getQueryClient } from './query-client';
+
+// Requests hang forever on a native fetch with no signal — a slow/unresponsive API
+// would leave a query spinning indefinitely. Abort after this budget so the UI can
+// surface an error (and React Query can retry) instead of stalling.
+const REQUEST_TIMEOUT_MS = 20_000;
 
 export class ApiError extends Error {
   constructor(
@@ -40,7 +46,7 @@ async function runRefresh(): Promise<boolean> {
   const refreshToken = useAuthStore.getState().tokens?.refreshToken;
   if (!refreshToken) return false;
   try {
-    const response = await fetch(`${env.apiUrl}/auth/refresh`, {
+    const response = await fetchWithTimeout(`${env.apiUrl}/auth/refresh`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ refreshToken }),
@@ -77,6 +83,32 @@ function refreshAccessToken(): Promise<boolean> {
   return refreshPromise;
 }
 
+/**
+ * Ensures a usable access token BEFORE authenticated queries fire, so the first read
+ * after the app reopens doesn't waterfall through 401 -> refresh -> retry. Returns true
+ * if the current token is still fresh, otherwise proactively refreshes once (deduped via
+ * the single-flight above). Returns false for a guest (no refresh token) — callers gate
+ * authenticated queries on a logged-in user anyway.
+ */
+export async function ensureFreshAccessToken(): Promise<boolean> {
+  const tokens = useAuthStore.getState().tokens;
+  if (!tokens?.refreshToken) return false;
+  if (isAccessTokenFresh(tokens.accessToken)) return true;
+  return refreshAccessToken();
+}
+
+/** Wraps fetch with an abort-based timeout, chaining any caller-supplied signal. */
+function fetchWithTimeout(url: string, init: RequestInit): Promise<Response> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  const callerSignal = init.signal;
+  if (callerSignal) {
+    if (callerSignal.aborted) controller.abort();
+    else callerSignal.addEventListener('abort', () => controller.abort(), { once: true });
+  }
+  return fetch(url, { ...init, signal: controller.signal }).finally(() => clearTimeout(timeout));
+}
+
 export async function apiFetch<TResponse>(
   path: string,
   options: RequestOptions = {},
@@ -85,7 +117,7 @@ export async function apiFetch<TResponse>(
   const { body, auth = false, headers, revalidateSeconds, ...init } = options;
   const accessToken = auth ? useAuthStore.getState().tokens?.accessToken : undefined;
 
-  const response = await fetch(`${env.apiUrl}${path}`, {
+  const response = await fetchWithTimeout(`${env.apiUrl}${path}`, {
     ...init,
     method: init.method ?? (body ? 'POST' : 'GET'),
     headers: {
@@ -132,7 +164,7 @@ export async function apiUpload<TResponse>(
 ): Promise<TResponse> {
   const accessToken = useAuthStore.getState().tokens?.accessToken;
 
-  const response = await fetch(`${env.apiUrl}${path}`, {
+  const response = await fetchWithTimeout(`${env.apiUrl}${path}`, {
     method: 'POST',
     headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined,
     body: formData,

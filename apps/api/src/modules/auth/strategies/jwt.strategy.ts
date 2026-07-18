@@ -12,8 +12,26 @@ interface AccessTokenPayload {
   email: string;
 }
 
+// `validate` runs on EVERY authenticated request and used to fire a 4-level-deep
+// user→roles→role→role_permissions→permissions include each time (~4-5 SQL
+// round-trips), uncached — the dominant per-request DB cost, badly amplified when
+// the DB is cross-region and the pooled connection is narrow. We now memoize the
+// resolved identity per-user for a short TTL: a burst of requests from one signed-in
+// user (page load fires cart/wishlist/profile/orders/addresses at once) collapses to
+// a single auth query. Trade-off: a role/permission change for a user takes effect
+// after at most AUTH_CACHE_TTL_MS instead of on the very next request — an accepted
+// staleness window (see CLAUDE.md). Per-instance Map, so it resets on redeploy/restart.
+const AUTH_CACHE_TTL_MS = 60_000;
+
+interface CachedIdentity {
+  expiresAt: number;
+  value: AuthenticatedUser;
+}
+
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
+  private readonly identityCache = new Map<string, CachedIdentity>();
+
   constructor(
     configService: ConfigService<AppConfiguration, true>,
     private readonly prisma: PrismaService,
@@ -26,6 +44,12 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
   }
 
   async validate(payload: AccessTokenPayload): Promise<AuthenticatedUser> {
+    const now = Date.now();
+    const cached = this.identityCache.get(payload.sub);
+    if (cached && cached.expiresAt > now) {
+      return cached.value;
+    }
+
     const user = await this.prisma.user.findUnique({
       where: { id: payload.sub },
       include: {
@@ -34,6 +58,9 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
     });
 
     if (!user || !user.isActive) {
+      // Never cache a rejection — a reactivated/undeleted account must work on its
+      // next request, and a disabled account must fail every request immediately.
+      this.identityCache.delete(payload.sub);
       throw new UnauthorizedException('Tài khoản không hợp lệ hoặc đã bị vô hiệu hoá');
     }
 
@@ -44,11 +71,14 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
       }
     }
 
-    return {
+    const identity: AuthenticatedUser = {
       id: user.id,
       email: user.email,
       roles: user.roles.map((userRole) => userRole.role.name) as RoleName[],
       permissions: [...permissions],
     };
+
+    this.identityCache.set(payload.sub, { expiresAt: now + AUTH_CACHE_TTL_MS, value: identity });
+    return identity;
   }
 }

@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { CheckoutInput, OrderTrackQuery } from '@repo/contracts';
 import { ordersApi } from '@/lib/api/orders';
 import { CART_QUERY_KEY } from './use-cart';
+import { useAuthReady } from './use-auth-ready';
 
 export function useCheckout() {
   const queryClient = useQueryClient();
@@ -25,5 +26,11 @@ export function useOrderTracking(query: OrderTrackQuery | null) {
 }
 
 export function useMyOrders(enabled: boolean) {
-  return useQuery({ queryKey: ['my-orders'], queryFn: ordersApi.listMine, enabled });
+  const authReady = useAuthReady();
+  return useQuery({
+    queryKey: ['my-orders'],
+    queryFn: ordersApi.listMine,
+    enabled: enabled && authReady,
+    staleTime: 2 * 60 * 1000,
+  });
 }

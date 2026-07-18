@@ -99,8 +99,15 @@ global `JwtAuthGuard`; `@Public()` opts a route out. RBAC is checked at both the
 `@RequirePermissions()`, `common/guards/permissions.guard.ts`) — a route with no
 `@RequirePermissions()` is unaffected, gated by `@Roles()` alone exactly as before.
 `JwtStrategy.validate` resolves both `roles` and a flattened, deduped `permissions: string[]`
-(every role's `RolePermission.permission.key`) fresh from the DB on every request, the same place
-`roles` was already resolved. `@RequirePermissions()` is applied only where the seeded
+(every role's `RolePermission.permission.key`) from the DB, the same place `roles` was already
+resolved. The resolved identity is memoized per-`userId` in a small per-instance in-memory cache
+with a short TTL (`AUTH_CACHE_TTL_MS`, 60s) — the deep user→roles→permissions include used to run
+on *every* authenticated request (the dominant per-request DB cost, amplified by a cross-region /
+narrow-pool DB), so a burst of requests from one signed-in user now collapses to a single auth
+query. Trade-off: a role/permission change for a user takes effect after at most that TTL rather
+than on the very next request (a rejection is never cached, so a disabled account fails
+immediately and a reactivated one works on its next request); the cache resets on
+redeploy/restart. `@RequirePermissions()` is applied only where the seeded
 role→permission mapping produces *identical* effective access to the existing `@Roles()` gating
 (Products/Orders/Users fully; Marketing's write endpoints only) — see `docs/architecture.md` for
 two spots deliberately left unenforced because the seed data disagrees with current `@Roles()`

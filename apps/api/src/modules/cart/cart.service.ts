@@ -35,6 +35,15 @@ const ITEM_INCLUDE = {
 
 type CartItemRow = Prisma.CartItemGetPayload<{ include: typeof ITEM_INCLUDE }>;
 
+// getOrCreateCart already round-trips to the DB (upsert) to resolve the cart row;
+// loadCartView needs the same row plus its coupon/voucher, so we include them here
+// and hand the whole record to loadCartView — that removes a second findUnique of the
+// same cart on every cart read/mutation (one fewer DB round-trip, which matters when
+// the DB is cross-region / narrow-pool). Coupon/voucher mutations patch this object
+// in memory before rendering rather than re-fetching.
+const CART_REFS_INCLUDE = { coupon: true, voucher: true } satisfies Prisma.CartInclude;
+type CartWithRefs = Prisma.CartGetPayload<{ include: typeof CART_REFS_INCLUDE }>;
+
 @Injectable()
 export class CartService {
   constructor(
@@ -44,7 +53,7 @@ export class CartService {
 
   async getCart(identity: CartIdentity): Promise<CartView> {
     const cart = await this.getOrCreateCart(identity);
-    return this.loadCartView(cart.id);
+    return this.loadCartView(cart);
   }
 
   async addItem(identity: CartIdentity, input: AddCartItemInput): Promise<CartView> {
@@ -105,7 +114,7 @@ export class CartService {
       });
     }
 
-    return this.loadCartView(cart.id);
+    return this.loadCartView(cart);
   }
 
   async updateItemQuantity(
@@ -137,7 +146,7 @@ export class CartService {
 
     await this.prisma.cartItem.update({ where: { id: item.id }, data: { quantity } });
 
-    return this.loadCartView(cart.id);
+    return this.loadCartView(cart);
   }
 
   async removeItem(identity: CartIdentity, itemId: string): Promise<CartView> {
@@ -150,7 +159,7 @@ export class CartService {
       throw new NotFoundException('Không tìm thấy sản phẩm trong giỏ hàng');
     }
 
-    return this.loadCartView(cart.id);
+    return this.loadCartView(cart);
   }
 
   async applyCoupon(identity: CartIdentity, code: string): Promise<CartView> {
@@ -173,13 +182,17 @@ export class CartService {
 
     await this.prisma.cart.update({ where: { id: cart.id }, data: { couponId: coupon.id } });
 
-    return this.loadCartView(cart.id);
+    cart.couponId = coupon.id;
+    cart.coupon = coupon;
+    return this.loadCartView(cart);
   }
 
   async removeCoupon(identity: CartIdentity): Promise<CartView> {
     const cart = await this.getOrCreateCart(identity);
     await this.prisma.cart.update({ where: { id: cart.id }, data: { couponId: null } });
-    return this.loadCartView(cart.id);
+    cart.couponId = null;
+    cart.coupon = null;
+    return this.loadCartView(cart);
   }
 
   async redeemVoucher(identity: CartIdentity, code: string): Promise<CartView> {
@@ -193,13 +206,17 @@ export class CartService {
 
     await this.prisma.cart.update({ where: { id: cart.id }, data: { voucherId: voucher.id } });
 
-    return this.loadCartView(cart.id);
+    cart.voucherId = voucher.id;
+    cart.voucher = voucher;
+    return this.loadCartView(cart);
   }
 
   async removeVoucher(identity: CartIdentity): Promise<CartView> {
     const cart = await this.getOrCreateCart(identity);
     await this.prisma.cart.update({ where: { id: cart.id }, data: { voucherId: null } });
-    return this.loadCartView(cart.id);
+    cart.voucherId = null;
+    cart.voucher = null;
+    return this.loadCartView(cart);
   }
 
   /**
@@ -270,13 +287,13 @@ export class CartService {
     });
   }
 
-  private async getOrCreateCart(identity: CartIdentity): Promise<{ id: string }> {
+  private async getOrCreateCart(identity: CartIdentity): Promise<CartWithRefs> {
     if (identity.userId) {
       return this.prisma.cart.upsert({
         where: { userId: identity.userId },
         update: {},
         create: { userId: identity.userId },
-        select: { id: true },
+        include: CART_REFS_INCLUDE,
       });
     }
 
@@ -285,7 +302,7 @@ export class CartService {
         where: { sessionId: identity.sessionId },
         update: {},
         create: { sessionId: identity.sessionId },
-        select: { id: true },
+        include: CART_REFS_INCLUDE,
       });
     }
 
@@ -307,6 +324,14 @@ export class CartService {
       include: ITEM_INCLUDE,
     });
 
+    // An empty cart can't match any promotion, so skip the three promotion loads
+    // entirely (loadComboDeals/loadBuyXGetYRules would otherwise scan all active
+    // combo/BOGO rows regardless). Saves three DB round-trips on every empty-cart GET
+    // — the common case for a just-arrived visitor whose header still fetches the cart.
+    if (items.length === 0) {
+      return { items, engineResult: runPromotionEngine([], [], [], []) };
+    }
+
     const productIds = [...new Set(items.map((item) => item.productId))];
     const [flashSaleItems, comboDeals, buyXGetYRules] = await Promise.all([
       this.promotionContext.loadFlashSaleItems(productIds),
@@ -326,11 +351,8 @@ export class CartService {
     return { items, engineResult };
   }
 
-  private async loadCartView(cartId: string): Promise<CartView> {
-    const cart = await this.prisma.cart.findUniqueOrThrow({
-      where: { id: cartId },
-      include: { coupon: true, voucher: true },
-    });
+  private async loadCartView(cart: CartWithRefs): Promise<CartView> {
+    const cartId = cart.id;
     const { items, engineResult } = await this.loadCartContext(cartId);
 
     const views: CartItemView[] = items.map((item, index) => {
