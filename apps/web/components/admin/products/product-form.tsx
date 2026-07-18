@@ -1,20 +1,17 @@
 'use client';
 
-import * as React from 'react';
 import { useRouter } from 'next/navigation';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Controller, useFieldArray, useForm } from 'react-hook-form';
 import { Plus, Trash2 } from 'lucide-react';
 import { type AdminProductDetail, type ProductInput, productInputSchema } from '@repo/contracts';
 import { MediaPicker } from '@/components/admin/media/media-picker';
-import { FormError } from '@/components/auth/form-error';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useAdminBrands } from '@/hooks/use-admin-brands';
 import { useAdminCategories } from '@/hooks/use-admin-categories';
 import { useCreateProduct, useUpdateProduct } from '@/hooks/use-admin-products';
-import { ApiError } from '@/lib/api-client';
 
 const numberFieldOptions = {
   setValueAs: (value: unknown) => {
@@ -79,7 +76,6 @@ export function ProductForm({ product }: { product?: AdminProductDetail }) {
   const { data: categories } = useAdminCategories();
   const createProduct = useCreateProduct();
   const updateProduct = useUpdateProduct();
-  const [serverError, setServerError] = React.useState<string | null>(null);
 
   const {
     register,
@@ -98,7 +94,6 @@ export function ProductForm({ product }: { product?: AdminProductDetail }) {
   const faqsArray = useFieldArray({ control, name: 'faqs' });
 
   const onSubmit = handleSubmit(async (values) => {
-    setServerError(null);
     try {
       if (isEdit) {
         await updateProduct.mutateAsync({ id: product.id, input: values });
@@ -106,9 +101,9 @@ export function ProductForm({ product }: { product?: AdminProductDetail }) {
         await createProduct.mutateAsync(values);
       }
       router.push('/admin/products');
-      router.refresh();
-    } catch (error) {
-      setServerError(error instanceof ApiError ? error.message : 'Không thể lưu sản phẩm');
+    } catch {
+      // Error toast is surfaced by the mutation hook; stay on the form so the
+      // admin can fix and retry instead of navigating away.
     }
   });
 
@@ -116,8 +111,6 @@ export function ProductForm({ product }: { product?: AdminProductDetail }) {
 
   return (
     <form onSubmit={onSubmit} className="space-y-8" noValidate>
-      <FormError message={serverError} />
-
       <section className="grid gap-4 rounded-2xl border border-border bg-card p-6 sm:grid-cols-2">
         <div className="space-y-1.5">
           <Label htmlFor="name">Tên sản phẩm</Label>

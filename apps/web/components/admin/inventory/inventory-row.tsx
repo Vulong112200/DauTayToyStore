@@ -4,8 +4,7 @@ import * as React from 'react';
 import Image from 'next/image';
 import type { AdminInventoryItem } from '@repo/contracts';
 import { useUpdateInventory } from '@/hooks/use-admin-inventory';
-import { ApiError } from '@/lib/api-client';
-import { toastSuccess } from '@/lib/toast';
+import { toastError, toastSuccess } from '@/lib/toast';
 import { cn } from '@/lib/utils';
 
 /**
@@ -23,7 +22,6 @@ export function InventoryRow({ item }: { item: AdminInventoryItem }) {
   const updateInventory = useUpdateInventory();
   const [quantityOnHand, setQuantityOnHand] = React.useState(item.quantityOnHand);
   const [lowStockThreshold, setLowStockThreshold] = React.useState(item.lowStockThreshold);
-  const [error, setError] = React.useState<string | null>(null);
 
   const isDirty =
     quantityOnHand !== item.quantityOnHand || lowStockThreshold !== item.lowStockThreshold;
@@ -35,7 +33,6 @@ export function InventoryRow({ item }: { item: AdminInventoryItem }) {
   const isLowStock = item.availableStock <= item.lowStockThreshold;
 
   async function handleSave() {
-    setError(null);
     try {
       await updateInventory.mutateAsync({
         productId: item.productId,
@@ -43,7 +40,7 @@ export function InventoryRow({ item }: { item: AdminInventoryItem }) {
       });
       toastSuccess(`Đã cập nhật tồn kho: ${item.productName}`);
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Không thể cập nhật tồn kho');
+      toastError(err, 'Không thể cập nhật tồn kho');
     }
   }
 
@@ -113,7 +110,6 @@ export function InventoryRow({ item }: { item: AdminInventoryItem }) {
             {updateInventory.isPending ? 'Đang lưu...' : 'Lưu'}
           </button>
         )}
-        {error && <p className="mt-1 text-xs text-destructive">{error}</p>}
       </td>
     </tr>
   );

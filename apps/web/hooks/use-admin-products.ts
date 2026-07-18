@@ -3,7 +3,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { AdminProductQuery, ProductInput } from '@repo/contracts';
 import { adminProductsApi } from '@/lib/api/admin/products';
-import { deleteMutationCallbacks } from '@/lib/admin-mutations';
+import { deleteMutationCallbacks, writeMutationCallbacks } from '@/lib/admin-mutations';
 
 const LIST_KEY = 'admin-products';
 
@@ -26,7 +26,12 @@ export function useCreateProduct() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (input: ProductInput) => adminProductsApi.create(input),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: [LIST_KEY] }),
+    ...writeMutationCallbacks(
+      queryClient,
+      [[LIST_KEY]],
+      'Đã thêm sản phẩm',
+      'Không thể thêm sản phẩm',
+    ),
   });
 }
 
@@ -35,7 +40,12 @@ export function useUpdateProduct() {
   return useMutation({
     mutationFn: ({ id, input }: { id: string; input: ProductInput }) =>
       adminProductsApi.update(id, input),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: [LIST_KEY] }),
+    ...writeMutationCallbacks(
+      queryClient,
+      [[LIST_KEY], ['admin-product']],
+      'Đã cập nhật sản phẩm',
+      'Không thể cập nhật sản phẩm',
+    ),
   });
 }
 

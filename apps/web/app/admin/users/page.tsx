@@ -13,7 +13,6 @@ import {
   useUpdateUser,
   useUpdateUserRoles,
 } from '@/hooks/use-admin-users';
-import { ApiError } from '@/lib/api-client';
 import { useAuthStore } from '@/store/auth-store';
 
 const ROLE_FILTER_OPTIONS: { value: string; label: string }[] = [
@@ -39,7 +38,6 @@ export default function AdminUsersPage() {
   const [q, setQ] = React.useState('');
   const [role, setRole] = React.useState('');
   const [mode, setMode] = React.useState<'idle' | 'create' | string>('idle');
-  const [error, setError] = React.useState<string | null>(null);
 
   const { data, isLoading } = useAdminUsers({
     page,
@@ -52,12 +50,11 @@ export default function AdminUsersPage() {
   const updateUserRoles = useUpdateUserRoles();
 
   async function handleCreate(input: CreateUserInput) {
-    setError(null);
     try {
       await createUser.mutateAsync(input);
       setMode('idle');
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Không thể tạo người dùng');
+    } catch {
+      // Error toast is surfaced by the mutation hook.
     }
   }
 
@@ -67,7 +64,6 @@ export default function AdminUsersPage() {
     roles: RoleName[],
     originalRoles: RoleName[],
   ) {
-    setError(null);
     try {
       await updateUser.mutateAsync({ id, input });
       const rolesChanged =
@@ -77,8 +73,8 @@ export default function AdminUsersPage() {
         await updateUserRoles.mutateAsync({ id, input: { roles } });
       }
       setMode('idle');
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Không thể lưu người dùng');
+    } catch {
+      // Error toast is surfaced by the mutation hook.
     }
   }
 
@@ -129,7 +125,6 @@ export default function AdminUsersPage() {
           onSubmit={handleCreate}
           onCancel={() => setMode('idle')}
           isSubmitting={createUser.isPending}
-          error={error}
         />
       )}
 
@@ -146,7 +141,6 @@ export default function AdminUsersPage() {
               }
               onCancel={() => setMode('idle')}
               isSubmitting={isSaving}
-              error={error}
             />
           ) : (
             <div
@@ -177,10 +171,7 @@ export default function AdminUsersPage() {
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={() => {
-                  setError(null);
-                  setMode(user.id);
-                }}
+                onClick={() => setMode(user.id)}
               >
                 Chỉnh sửa
               </Button>

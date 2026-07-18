@@ -13,7 +13,6 @@ import {
   useUpdateBanner,
 } from '@/hooks/use-admin-banners';
 import { useCanManageContent } from '@/hooks/use-can-manage';
-import { ApiError } from '@/lib/api-client';
 
 const POSITION_LABELS: Record<string, string> = {
   HOME_HERO: 'Trang chủ - Banner chính',
@@ -30,25 +29,22 @@ export default function AdminBannersPage() {
   const canManage = useCanManageContent();
 
   const [mode, setMode] = React.useState<'idle' | 'create' | string>('idle');
-  const [error, setError] = React.useState<string | null>(null);
 
   async function handleCreate(input: BannerInput) {
-    setError(null);
     try {
       await createBanner.mutateAsync(input);
       setMode('idle');
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Không thể lưu banner');
+    } catch {
+      // Error toast is surfaced by the mutation hook.
     }
   }
 
   async function handleUpdate(id: string, input: BannerInput) {
-    setError(null);
     try {
       await updateBanner.mutateAsync({ id, input });
       setMode('idle');
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Không thể lưu banner');
+    } catch {
+      // Error toast is surfaced by the mutation hook.
     }
   }
 
@@ -70,7 +66,6 @@ export default function AdminBannersPage() {
           onSubmit={handleCreate}
           onCancel={() => setMode('idle')}
           isSubmitting={createBanner.isPending}
-          error={error}
         />
       )}
 
@@ -83,7 +78,6 @@ export default function AdminBannersPage() {
               onSubmit={(input) => handleUpdate(banner.id, input)}
               onCancel={() => setMode('idle')}
               isSubmitting={updateBanner.isPending}
-              error={error}
             />
           ) : (
             <div

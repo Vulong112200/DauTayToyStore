@@ -13,7 +13,6 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useAdminMedia, useUploadMedia } from '@/hooks/use-admin-media';
-import { ApiError } from '@/lib/api-client';
 
 /**
  * Text input for the URL (so pasting an external image URL still works, same as before) plus
@@ -81,7 +80,6 @@ function MediaPickerDialog({
   const [page, setPage] = React.useState(1);
   const { data, isLoading } = useAdminMedia({ page, pageSize: 24, type: 'IMAGE' });
   const uploadMedia = useUploadMedia();
-  const [error, setError] = React.useState<string | null>(null);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
 
   async function handleFileSelected(event: React.ChangeEvent<HTMLInputElement>) {
@@ -89,12 +87,11 @@ function MediaPickerDialog({
     event.target.value = '';
     if (!file) return;
 
-    setError(null);
     try {
       const asset = await uploadMedia.mutateAsync(file);
       onSelect(asset.url);
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Không thể tải ảnh lên');
+    } catch {
+      // Success/error toast is surfaced by the mutation hook.
     }
   }
 
@@ -127,8 +124,6 @@ function MediaPickerDialog({
             onChange={handleFileSelected}
           />
         </div>
-
-        {error && <p className="text-sm text-destructive">{error}</p>}
 
         <div className="max-h-[60vh] overflow-y-auto">
           {isLoading ? (

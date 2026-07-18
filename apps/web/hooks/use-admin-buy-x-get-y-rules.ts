@@ -3,7 +3,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { BuyXGetYRuleInput } from '@repo/contracts';
 import { adminBuyXGetYRulesApi } from '@/lib/api/admin/buy-x-get-y-rules';
-import { deleteMutationCallbacks } from '@/lib/admin-mutations';
+import { deleteMutationCallbacks, writeMutationCallbacks } from '@/lib/admin-mutations';
 
 const LIST_KEY = 'admin-buy-x-get-y-rules';
 
@@ -15,7 +15,12 @@ export function useCreateBuyXGetYRule() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (input: BuyXGetYRuleInput) => adminBuyXGetYRulesApi.create(input),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: [LIST_KEY] }),
+    ...writeMutationCallbacks(
+      queryClient,
+      [[LIST_KEY]],
+      'Đã thêm quy tắc mua X tặng Y',
+      'Không thể thêm quy tắc mua X tặng Y',
+    ),
   });
 }
 
@@ -24,7 +29,12 @@ export function useUpdateBuyXGetYRule() {
   return useMutation({
     mutationFn: ({ id, input }: { id: string; input: BuyXGetYRuleInput }) =>
       adminBuyXGetYRulesApi.update(id, input),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: [LIST_KEY] }),
+    ...writeMutationCallbacks(
+      queryClient,
+      [[LIST_KEY]],
+      'Đã cập nhật quy tắc mua X tặng Y',
+      'Không thể cập nhật quy tắc mua X tặng Y',
+    ),
   });
 }
 

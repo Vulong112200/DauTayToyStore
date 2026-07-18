@@ -3,7 +3,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { AdminMediaQuery } from '@repo/contracts';
 import { adminMediaApi } from '@/lib/api/admin/media';
-import { deleteMutationCallbacks } from '@/lib/admin-mutations';
+import { deleteMutationCallbacks, writeMutationCallbacks } from '@/lib/admin-mutations';
 
 const LIST_KEY = 'admin-media';
 
@@ -15,7 +15,7 @@ export function useUploadMedia() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (file: File) => adminMediaApi.upload(file),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: [LIST_KEY] }),
+    ...writeMutationCallbacks(queryClient, [[LIST_KEY]], 'Đã tải tệp lên', 'Không thể tải tệp lên'),
   });
 }
 

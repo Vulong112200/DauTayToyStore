@@ -6,7 +6,6 @@ import { Copy, Trash2, Upload } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAdminMedia, useDeleteMedia, useUploadMedia } from '@/hooks/use-admin-media';
 import { useCanManageContent } from '@/hooks/use-can-manage';
-import { ApiError } from '@/lib/api-client';
 
 function formatBytes(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
@@ -20,7 +19,6 @@ export default function AdminMediaPage() {
   const uploadMedia = useUploadMedia();
   const deleteMedia = useDeleteMedia();
   const canManage = useCanManageContent();
-  const [error, setError] = React.useState<string | null>(null);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
 
   async function handleFileSelected(event: React.ChangeEvent<HTMLInputElement>) {
@@ -28,11 +26,10 @@ export default function AdminMediaPage() {
     event.target.value = '';
     if (!file) return;
 
-    setError(null);
     try {
       await uploadMedia.mutateAsync(file);
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Không thể tải tệp lên');
+    } catch {
+      // Success/error toast is surfaced by the mutation hook.
     }
   }
 
@@ -60,8 +57,6 @@ export default function AdminMediaPage() {
           </>
         )}
       </div>
-
-      {error && <p className="text-sm text-destructive">{error}</p>}
 
       {isLoading ? (
         <p className="text-muted-foreground">Đang tải...</p>

@@ -1,6 +1,5 @@
 'use client';
 
-import * as React from 'react';
 import { useRouter } from 'next/navigation';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Controller, useForm } from 'react-hook-form';
@@ -10,13 +9,11 @@ import {
   blogPostInputSchema,
 } from '@repo/contracts';
 import { MediaPicker } from '@/components/admin/media/media-picker';
-import { FormError } from '@/components/auth/form-error';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useAdminBlogCategories } from '@/hooks/use-admin-blog-categories';
 import { useCreateBlogPost, useUpdateBlogPost } from '@/hooks/use-admin-blog-posts';
-import { ApiError } from '@/lib/api-client';
 
 function toDefaultValues(post?: AdminBlogPostDetail): BlogPostInput {
   if (!post) {
@@ -42,7 +39,6 @@ export function BlogPostForm({ post }: { post?: AdminBlogPostDetail }) {
   const { data: categories } = useAdminBlogCategories();
   const createPost = useCreateBlogPost();
   const updatePost = useUpdateBlogPost();
-  const [serverError, setServerError] = React.useState<string | null>(null);
 
   const {
     register,
@@ -55,7 +51,6 @@ export function BlogPostForm({ post }: { post?: AdminBlogPostDetail }) {
   });
 
   const onSubmit = handleSubmit(async (values) => {
-    setServerError(null);
     try {
       if (isEdit) {
         await updatePost.mutateAsync({ id: post.id, input: values });
@@ -63,9 +58,9 @@ export function BlogPostForm({ post }: { post?: AdminBlogPostDetail }) {
         await createPost.mutateAsync(values);
       }
       router.push('/admin/blog');
-      router.refresh();
-    } catch (error) {
-      setServerError(error instanceof ApiError ? error.message : 'Không thể lưu bài viết');
+    } catch {
+      // Error toast is surfaced by the mutation hook; stay on the form so the
+      // admin can fix and retry instead of navigating away.
     }
   });
 
@@ -73,8 +68,6 @@ export function BlogPostForm({ post }: { post?: AdminBlogPostDetail }) {
 
   return (
     <form onSubmit={onSubmit} className="space-y-8" noValidate>
-      <FormError message={serverError} />
-
       <section className="grid gap-4 rounded-2xl border border-border bg-card p-6 sm:grid-cols-2">
         <div className="space-y-1.5">
           <Label htmlFor="title">Tiêu đề</Label>

@@ -12,7 +12,6 @@ import {
   useUpdateFreeShippingRule,
 } from '@/hooks/use-admin-free-shipping-rules';
 import { useCanManageContent } from '@/hooks/use-can-manage';
-import { ApiError } from '@/lib/api-client';
 import { formatVnd } from '@/lib/utils';
 
 export default function AdminFreeShippingRulesPage() {
@@ -23,25 +22,22 @@ export default function AdminFreeShippingRulesPage() {
   const canManage = useCanManageContent();
 
   const [mode, setMode] = React.useState<'idle' | 'create' | string>('idle');
-  const [error, setError] = React.useState<string | null>(null);
 
   async function handleCreate(input: FreeShippingRuleInput) {
-    setError(null);
     try {
       await createRule.mutateAsync(input);
       setMode('idle');
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Không thể lưu quy tắc');
+    } catch {
+      // Error toast is surfaced by the mutation hook.
     }
   }
 
   async function handleUpdate(id: string, input: FreeShippingRuleInput) {
-    setError(null);
     try {
       await updateRule.mutateAsync({ id, input });
       setMode('idle');
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Không thể lưu quy tắc');
+    } catch {
+      // Error toast is surfaced by the mutation hook.
     }
   }
 
@@ -63,7 +59,6 @@ export default function AdminFreeShippingRulesPage() {
           onSubmit={handleCreate}
           onCancel={() => setMode('idle')}
           isSubmitting={createRule.isPending}
-          error={error}
         />
       )}
 
@@ -76,7 +71,6 @@ export default function AdminFreeShippingRulesPage() {
               onSubmit={(input) => handleUpdate(rule.id, input)}
               onCancel={() => setMode('idle')}
               isSubmitting={updateRule.isPending}
-              error={error}
             />
           ) : (
             <div

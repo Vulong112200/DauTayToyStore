@@ -12,7 +12,6 @@ import {
   useUpdateBuyXGetYRule,
 } from '@/hooks/use-admin-buy-x-get-y-rules';
 import { useCanManageContent } from '@/hooks/use-can-manage';
-import { ApiError } from '@/lib/api-client';
 
 export default function AdminBuyXGetYRulesPage() {
   const { data: rules, isLoading } = useAdminBuyXGetYRules();
@@ -22,25 +21,22 @@ export default function AdminBuyXGetYRulesPage() {
   const canManage = useCanManageContent();
 
   const [mode, setMode] = React.useState<'idle' | 'create' | string>('idle');
-  const [error, setError] = React.useState<string | null>(null);
 
   async function handleCreate(input: BuyXGetYRuleInput) {
-    setError(null);
     try {
       await createRule.mutateAsync(input);
       setMode('idle');
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Không thể lưu chương trình');
+    } catch {
+      // Error toast is surfaced by the mutation hook.
     }
   }
 
   async function handleUpdate(id: string, input: BuyXGetYRuleInput) {
-    setError(null);
     try {
       await updateRule.mutateAsync({ id, input });
       setMode('idle');
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Không thể lưu chương trình');
+    } catch {
+      // Error toast is surfaced by the mutation hook.
     }
   }
 
@@ -62,7 +58,6 @@ export default function AdminBuyXGetYRulesPage() {
           onSubmit={handleCreate}
           onCancel={() => setMode('idle')}
           isSubmitting={createRule.isPending}
-          error={error}
         />
       )}
 
@@ -75,7 +70,6 @@ export default function AdminBuyXGetYRulesPage() {
               onSubmit={(input) => handleUpdate(rule.id, input)}
               onCancel={() => setMode('idle')}
               isSubmitting={updateRule.isPending}
-              error={error}
             />
           ) : (
             <div

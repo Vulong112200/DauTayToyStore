@@ -12,7 +12,6 @@ import {
   useUpdateBlogCategory,
 } from '@/hooks/use-admin-blog-categories';
 import { useCanManageContent } from '@/hooks/use-can-manage';
-import { ApiError } from '@/lib/api-client';
 
 export default function AdminBlogCategoriesPage() {
   const { data: categories, isLoading } = useAdminBlogCategories();
@@ -22,25 +21,22 @@ export default function AdminBlogCategoriesPage() {
   const canManage = useCanManageContent();
 
   const [mode, setMode] = React.useState<'idle' | 'create' | string>('idle');
-  const [error, setError] = React.useState<string | null>(null);
 
   async function handleCreate(input: BlogCategoryInput) {
-    setError(null);
     try {
       await createCategory.mutateAsync(input);
       setMode('idle');
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Không thể lưu danh mục');
+    } catch {
+      // Error toast is surfaced by the mutation hook.
     }
   }
 
   async function handleUpdate(id: string, input: BlogCategoryInput) {
-    setError(null);
     try {
       await updateCategory.mutateAsync({ id, input });
       setMode('idle');
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Không thể lưu danh mục');
+    } catch {
+      // Error toast is surfaced by the mutation hook.
     }
   }
 
@@ -62,7 +58,6 @@ export default function AdminBlogCategoriesPage() {
           onSubmit={handleCreate}
           onCancel={() => setMode('idle')}
           isSubmitting={createCategory.isPending}
-          error={error}
         />
       )}
 
@@ -75,7 +70,6 @@ export default function AdminBlogCategoriesPage() {
               onSubmit={(input) => handleUpdate(category.id, input)}
               onCancel={() => setMode('idle')}
               isSubmitting={updateCategory.isPending}
-              error={error}
             />
           ) : (
             <div

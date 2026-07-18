@@ -3,7 +3,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { BrandInput } from '@repo/contracts';
 import { adminBrandsApi } from '@/lib/api/admin/brands';
-import { deleteMutationCallbacks } from '@/lib/admin-mutations';
+import { deleteMutationCallbacks, writeMutationCallbacks } from '@/lib/admin-mutations';
 
 const KEY = ['admin-brands'];
 
@@ -15,7 +15,12 @@ export function useCreateBrand() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (input: BrandInput) => adminBrandsApi.create(input),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: KEY }),
+    ...writeMutationCallbacks(
+      queryClient,
+      [KEY],
+      'Đã thêm thương hiệu',
+      'Không thể thêm thương hiệu',
+    ),
   });
 }
 
@@ -24,7 +29,12 @@ export function useUpdateBrand() {
   return useMutation({
     mutationFn: ({ id, input }: { id: string; input: BrandInput }) =>
       adminBrandsApi.update(id, input),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: KEY }),
+    ...writeMutationCallbacks(
+      queryClient,
+      [KEY],
+      'Đã cập nhật thương hiệu',
+      'Không thể cập nhật thương hiệu',
+    ),
   });
 }
 

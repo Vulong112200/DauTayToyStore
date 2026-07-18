@@ -1,6 +1,5 @@
 'use client';
 
-import * as React from 'react';
 import { useRouter } from 'next/navigation';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Controller, useFieldArray, useForm } from 'react-hook-form';
@@ -10,13 +9,11 @@ import {
   type FlashSaleInput,
   flashSaleInputSchema,
 } from '@repo/contracts';
-import { FormError } from '@/components/auth/form-error';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useAdminProducts } from '@/hooks/use-admin-products';
 import { useCreateFlashSale, useUpdateFlashSale } from '@/hooks/use-admin-flash-sales';
-import { ApiError } from '@/lib/api-client';
 
 // Convert a stored ISO instant into the `YYYY-MM-DDTHH:mm` local-time string a datetime-local
 // input expects (for display only).
@@ -68,7 +65,6 @@ export function FlashSaleForm({ flashSale }: { flashSale?: AdminFlashSaleDetail 
   const { data: products } = useAdminProducts({ page: 1, pageSize: 100 });
   const createFlashSale = useCreateFlashSale();
   const updateFlashSale = useUpdateFlashSale();
-  const [serverError, setServerError] = React.useState<string | null>(null);
 
   const {
     register,
@@ -83,7 +79,6 @@ export function FlashSaleForm({ flashSale }: { flashSale?: AdminFlashSaleDetail 
   const itemsArray = useFieldArray({ control, name: 'items' });
 
   const onSubmit = handleSubmit(async (values) => {
-    setServerError(null);
     try {
       if (isEdit) {
         await updateFlashSale.mutateAsync({ id: flashSale.id, input: values });
@@ -91,9 +86,8 @@ export function FlashSaleForm({ flashSale }: { flashSale?: AdminFlashSaleDetail 
         await createFlashSale.mutateAsync(values);
       }
       router.push('/admin/flash-sales');
-      router.refresh();
-    } catch (error) {
-      setServerError(error instanceof ApiError ? error.message : 'Không thể lưu flash sale');
+    } catch {
+      // Error toast is surfaced by the mutation hook; stay on the form to retry.
     }
   });
 
@@ -101,8 +95,6 @@ export function FlashSaleForm({ flashSale }: { flashSale?: AdminFlashSaleDetail 
 
   return (
     <form onSubmit={onSubmit} className="space-y-8" noValidate>
-      <FormError message={serverError} />
-
       <section className="grid gap-4 rounded-2xl border border-border bg-card p-6 sm:grid-cols-2">
         <div className="space-y-1.5 sm:col-span-2">
           <Label htmlFor="name">Tên đợt flash sale</Label>

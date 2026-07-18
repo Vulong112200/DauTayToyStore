@@ -7,7 +7,6 @@ import {
   type BuyXGetYRuleInput,
   buyXGetYRuleInputSchema,
 } from '@repo/contracts';
-import { FormError } from '@/components/auth/form-error';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -18,13 +17,11 @@ export function BuyXGetYRuleForm({
   onSubmit,
   onCancel,
   isSubmitting,
-  error,
 }: {
   initialValue?: AdminBuyXGetYRule;
   onSubmit: (input: BuyXGetYRuleInput) => void;
   onCancel?: () => void;
   isSubmitting: boolean;
-  error: string | null;
 }) {
   const { data: products } = useAdminProducts({ page: 1, pageSize: 100 });
   const {
@@ -52,7 +49,6 @@ export function BuyXGetYRuleForm({
       className="space-y-4 rounded-2xl border border-border p-4"
       noValidate
     >
-      <FormError message={error} />
       <div className="space-y-1.5">
         <Label htmlFor="name">Tên chương trình</Label>
         <Input id="name" aria-invalid={!!errors.name} {...register('name')} />

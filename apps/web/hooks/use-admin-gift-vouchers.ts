@@ -3,7 +3,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { AdminGiftVoucherQuery, GiftVoucherInput, UpdateGiftVoucherInput } from '@repo/contracts';
 import { adminGiftVouchersApi } from '@/lib/api/admin/gift-vouchers';
-import { deleteMutationCallbacks } from '@/lib/admin-mutations';
+import { deleteMutationCallbacks, writeMutationCallbacks } from '@/lib/admin-mutations';
 
 const LIST_KEY = 'admin-gift-vouchers';
 
@@ -18,7 +18,12 @@ export function useCreateGiftVoucher() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (input: GiftVoucherInput) => adminGiftVouchersApi.create(input),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: [LIST_KEY] }),
+    ...writeMutationCallbacks(
+      queryClient,
+      [[LIST_KEY]],
+      'Đã thêm phiếu quà tặng',
+      'Không thể thêm phiếu quà tặng',
+    ),
   });
 }
 
@@ -27,7 +32,12 @@ export function useUpdateGiftVoucher() {
   return useMutation({
     mutationFn: ({ id, input }: { id: string; input: UpdateGiftVoucherInput }) =>
       adminGiftVouchersApi.update(id, input),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: [LIST_KEY] }),
+    ...writeMutationCallbacks(
+      queryClient,
+      [[LIST_KEY]],
+      'Đã cập nhật phiếu quà tặng',
+      'Không thể cập nhật phiếu quà tặng',
+    ),
   });
 }
 

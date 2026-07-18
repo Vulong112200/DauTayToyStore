@@ -12,7 +12,6 @@ import {
   useUpdateBrand,
 } from '@/hooks/use-admin-brands';
 import { useCanManageContent } from '@/hooks/use-can-manage';
-import { ApiError } from '@/lib/api-client';
 
 export default function AdminBrandsPage() {
   const { data: brands, isLoading } = useAdminBrands();
@@ -22,25 +21,22 @@ export default function AdminBrandsPage() {
   const canManage = useCanManageContent();
 
   const [mode, setMode] = React.useState<'idle' | 'create' | string>('idle');
-  const [error, setError] = React.useState<string | null>(null);
 
   async function handleCreate(input: BrandInput) {
-    setError(null);
     try {
       await createBrand.mutateAsync(input);
       setMode('idle');
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Không thể lưu thương hiệu');
+    } catch {
+      // Error toast is surfaced by the mutation hook.
     }
   }
 
   async function handleUpdate(id: string, input: BrandInput) {
-    setError(null);
     try {
       await updateBrand.mutateAsync({ id, input });
       setMode('idle');
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Không thể lưu thương hiệu');
+    } catch {
+      // Error toast is surfaced by the mutation hook.
     }
   }
 
@@ -62,7 +58,6 @@ export default function AdminBrandsPage() {
           onSubmit={handleCreate}
           onCancel={() => setMode('idle')}
           isSubmitting={createBrand.isPending}
-          error={error}
         />
       )}
 
@@ -75,7 +70,6 @@ export default function AdminBrandsPage() {
               onSubmit={(input) => handleUpdate(brand.id, input)}
               onCancel={() => setMode('idle')}
               isSubmitting={updateBrand.isPending}
-              error={error}
             />
           ) : (
             <div

@@ -1,16 +1,13 @@
 'use client';
 
-import * as React from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import { type UpdateSiteSettingsInput, updateSiteSettingsSchema } from '@repo/contracts';
 import { AdminQueryError } from '@/components/admin/admin-query-error';
-import { FormError } from '@/components/auth/form-error';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useAdminSettings, useUpdateSettings } from '@/hooks/use-admin-settings';
-import { ApiError } from '@/lib/api-client';
 
 const numberFieldOptions = {
   setValueAs: (value: unknown) => {
@@ -23,8 +20,6 @@ const numberFieldOptions = {
 export default function AdminSettingsPage() {
   const { data: settings, isLoading, isError, error: queryError, refetch } = useAdminSettings();
   const updateSettings = useUpdateSettings();
-  const [error, setError] = React.useState<string | null>(null);
-  const [success, setSuccess] = React.useState(false);
 
   const {
     register,
@@ -37,14 +32,11 @@ export default function AdminSettingsPage() {
   });
 
   const onSubmit = handleSubmit(async (values) => {
-    setError(null);
-    setSuccess(false);
     try {
       await updateSettings.mutateAsync(values);
-      setSuccess(true);
       reset(values);
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Không thể lưu cấu hình');
+    } catch {
+      // Success/error toast is surfaced by the mutation hook.
     }
   });
 
@@ -61,9 +53,6 @@ export default function AdminSettingsPage() {
       <h1 className="font-display text-2xl font-bold">Cấu hình cửa hàng</h1>
 
       <form onSubmit={onSubmit} className="max-w-2xl space-y-6" noValidate>
-        <FormError message={error} />
-        {success && <p className="text-sm text-primary">Đã lưu cấu hình.</p>}
-
         <section className="grid gap-4 rounded-2xl border border-border bg-card p-6 sm:grid-cols-2">
           <div className="space-y-1.5 sm:col-span-2">
             <Label htmlFor="siteName">Tên cửa hàng</Label>

@@ -12,7 +12,6 @@ import {
   useUpdateCoupon,
 } from '@/hooks/use-admin-coupons';
 import { useCanManageContent } from '@/hooks/use-can-manage';
-import { ApiError } from '@/lib/api-client';
 import { formatVnd } from '@/lib/utils';
 
 function formatValue(coupon: { type: string; value: number }): string {
@@ -29,25 +28,22 @@ export default function AdminCouponsPage() {
   const canManage = useCanManageContent();
 
   const [mode, setMode] = React.useState<'idle' | 'create' | string>('idle');
-  const [error, setError] = React.useState<string | null>(null);
 
   async function handleCreate(input: CouponInput) {
-    setError(null);
     try {
       await createCoupon.mutateAsync(input);
       setMode('idle');
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Không thể lưu mã giảm giá');
+    } catch {
+      // Error toast is surfaced by the mutation hook.
     }
   }
 
   async function handleUpdate(id: string, input: CouponInput) {
-    setError(null);
     try {
       await updateCoupon.mutateAsync({ id, input });
       setMode('idle');
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Không thể lưu mã giảm giá');
+    } catch {
+      // Error toast is surfaced by the mutation hook.
     }
   }
 
@@ -81,7 +77,6 @@ export default function AdminCouponsPage() {
           onSubmit={handleCreate}
           onCancel={() => setMode('idle')}
           isSubmitting={createCoupon.isPending}
-          error={error}
         />
       )}
 
@@ -94,7 +89,6 @@ export default function AdminCouponsPage() {
               onSubmit={(input) => handleUpdate(coupon.id, input)}
               onCancel={() => setMode('idle')}
               isSubmitting={updateCoupon.isPending}
-              error={error}
             />
           ) : (
             <div

@@ -9,7 +9,6 @@ import {
   giftVoucherInputSchema,
   updateGiftVoucherInputSchema,
 } from '@repo/contracts';
-import { FormError } from '@/components/auth/form-error';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -26,12 +25,10 @@ export function GiftVoucherCreateForm({
   onSubmit,
   onCancel,
   isSubmitting,
-  error,
 }: {
   onSubmit: (input: GiftVoucherInput) => void;
   onCancel?: () => void;
   isSubmitting: boolean;
-  error: string | null;
 }) {
   const {
     register,
@@ -48,7 +45,6 @@ export function GiftVoucherCreateForm({
       className="space-y-4 rounded-2xl border border-border p-4"
       noValidate
     >
-      <FormError message={error} />
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="space-y-1.5">
           <Label htmlFor="code">Mã phiếu</Label>
@@ -104,13 +100,11 @@ export function GiftVoucherEditForm({
   onSubmit,
   onCancel,
   isSubmitting,
-  error,
 }: {
   voucher: AdminGiftVoucher;
   onSubmit: (input: UpdateGiftVoucherInput) => void;
   onCancel: () => void;
   isSubmitting: boolean;
-  error: string | null;
 }) {
   const {
     register,
@@ -132,7 +126,6 @@ export function GiftVoucherEditForm({
       className="space-y-4 rounded-2xl border border-border p-4"
       noValidate
     >
-      <FormError message={error} />
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="space-y-1.5">
           <Label htmlFor="balance">Số dư còn lại (VNĐ)</Label>

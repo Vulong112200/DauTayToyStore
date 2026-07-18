@@ -15,7 +15,6 @@ import {
   useUpdateGiftVoucher,
 } from '@/hooks/use-admin-gift-vouchers';
 import { useCanManageContent } from '@/hooks/use-can-manage';
-import { ApiError } from '@/lib/api-client';
 import { formatVnd } from '@/lib/utils';
 
 export default function AdminGiftVouchersPage() {
@@ -27,25 +26,22 @@ export default function AdminGiftVouchersPage() {
   const canManage = useCanManageContent();
 
   const [mode, setMode] = React.useState<'idle' | 'create' | string>('idle');
-  const [error, setError] = React.useState<string | null>(null);
 
   async function handleCreate(input: GiftVoucherInput) {
-    setError(null);
     try {
       await createVoucher.mutateAsync(input);
       setMode('idle');
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Không thể tạo phiếu quà tặng');
+    } catch {
+      // Error toast is surfaced by the mutation hook.
     }
   }
 
   async function handleUpdate(id: string, input: UpdateGiftVoucherInput) {
-    setError(null);
     try {
       await updateVoucher.mutateAsync({ id, input });
       setMode('idle');
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Không thể lưu phiếu quà tặng');
+    } catch {
+      // Error toast is surfaced by the mutation hook.
     }
   }
 
@@ -67,7 +63,6 @@ export default function AdminGiftVouchersPage() {
           onSubmit={handleCreate}
           onCancel={() => setMode('idle')}
           isSubmitting={createVoucher.isPending}
-          error={error}
         />
       )}
 
@@ -80,7 +75,6 @@ export default function AdminGiftVouchersPage() {
               onSubmit={(input) => handleUpdate(voucher.id, input)}
               onCancel={() => setMode('idle')}
               isSubmitting={updateVoucher.isPending}
-              error={error}
             />
           ) : (
             <div

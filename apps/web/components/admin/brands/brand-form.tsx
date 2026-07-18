@@ -4,7 +4,6 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { Controller, useForm } from 'react-hook-form';
 import { type AdminBrand, type BrandInput, brandInputSchema } from '@repo/contracts';
 import { MediaPicker } from '@/components/admin/media/media-picker';
-import { FormError } from '@/components/auth/form-error';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -14,13 +13,11 @@ export function BrandForm({
   onSubmit,
   onCancel,
   isSubmitting,
-  error,
 }: {
   initialValue?: AdminBrand;
   onSubmit: (input: BrandInput) => void;
   onCancel?: () => void;
   isSubmitting: boolean;
-  error: string | null;
 }) {
   const {
     register,
@@ -47,7 +44,6 @@ export function BrandForm({
       className="space-y-4 rounded-2xl border border-border p-4"
       noValidate
     >
-      <FormError message={error} />
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="space-y-1.5">
           <Label htmlFor="name">Tên thương hiệu</Label>

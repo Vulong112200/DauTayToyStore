@@ -1,5 +1,13 @@
 # Hướng dẫn Deploy: Render (API) + Vercel (Web)
 
+> **Đang chạy live (cập nhật 2026-07-18):**
+> - Web (Vercel): `https://dautaytoy.vercel.app`
+> - API (Render): `https://dautaytoystore.onrender.com` (base path `/api`, ví dụ `/api/health`)
+> - Push lên nhánh `main` (GitHub `Vulong112200/DauTayToyStore`) sẽ tự động deploy cả hai; bước
+>   deploy của Render chạy `prisma migrate deploy`.
+> Các URL placeholder bên dưới (`your-app.vercel.app`, `dautaytoy-api.onrender.com`) chỉ là ví dụ
+> minh hoạ cho các bước cấu hình — dùng URL thật ở trên khi thao tác.
+
 Tài liệu này hướng dẫn từng bước deploy production cho DauTayToy Store:
 - **Backend** (`apps/api`, NestJS) → **Render** (Docker Web Service)
 - **Frontend** (`apps/web`, Next.js) → **Vercel**

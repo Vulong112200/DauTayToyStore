@@ -6,8 +6,7 @@ import type { OrderStatus } from '@repo/contracts';
 import { AdminQueryError } from '@/components/admin/admin-query-error';
 import { Button } from '@/components/ui/button';
 import { useAdminOrder, useUpdateOrderStatus } from '@/hooks/use-admin-orders';
-import { ApiError } from '@/lib/api-client';
-import { toastSuccess } from '@/lib/toast';
+import { toastError, toastSuccess } from '@/lib/toast';
 import { ORDER_STATUS_LABELS } from '@/lib/order-status';
 import { formatVnd } from '@/lib/utils';
 
@@ -27,7 +26,6 @@ export default function AdminOrderDetailPage() {
   const updateStatus = useUpdateOrderStatus();
   const [nextStatus, setNextStatus] = React.useState<OrderStatus | ''>('');
   const [note, setNote] = React.useState('');
-  const [error, setError] = React.useState<string | null>(null);
 
   if (isError) {
     return <AdminQueryError error={queryError} onRetry={() => refetch()} />;
@@ -39,7 +37,6 @@ export default function AdminOrderDetailPage() {
 
   async function handleUpdateStatus() {
     if (!nextStatus || !order) return;
-    setError(null);
     try {
       await updateStatus.mutateAsync({
         id: order.id,
@@ -49,7 +46,7 @@ export default function AdminOrderDetailPage() {
       setNote('');
       toastSuccess('Đã cập nhật trạng thái đơn hàng');
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Không thể cập nhật trạng thái');
+      toastError(err, 'Không thể cập nhật trạng thái');
     }
   }
 
@@ -158,7 +155,6 @@ export default function AdminOrderDetailPage() {
 
           <section className="rounded-2xl border border-border bg-card p-6">
             <h2 className="font-display text-lg font-bold">Cập nhật trạng thái</h2>
-            {error && <p className="mt-2 text-sm text-destructive">{error}</p>}
             <div className="mt-4 space-y-3">
               <select
                 value={nextStatus}

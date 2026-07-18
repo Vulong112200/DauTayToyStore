@@ -7,7 +7,6 @@ import {
   type BlogCategoryInput,
   blogCategoryInputSchema,
 } from '@repo/contracts';
-import { FormError } from '@/components/auth/form-error';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -17,13 +16,11 @@ export function BlogCategoryForm({
   onSubmit,
   onCancel,
   isSubmitting,
-  error,
 }: {
   initialValue?: AdminBlogCategory;
   onSubmit: (input: BlogCategoryInput) => void;
   onCancel?: () => void;
   isSubmitting: boolean;
-  error: string | null;
 }) {
   const {
     register,
@@ -42,7 +39,6 @@ export function BlogCategoryForm({
       className="space-y-4 rounded-2xl border border-border p-4"
       noValidate
     >
-      <FormError message={error} />
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="space-y-1.5">
           <Label htmlFor="name">Tên danh mục</Label>

@@ -1,18 +1,15 @@
 'use client';
 
-import * as React from 'react';
 import { useRouter } from 'next/navigation';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useFieldArray, useForm } from 'react-hook-form';
 import { Plus, Trash2 } from 'lucide-react';
 import { type AdminComboDealDetail, type ComboDealInput, comboDealInputSchema } from '@repo/contracts';
-import { FormError } from '@/components/auth/form-error';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useAdminProducts } from '@/hooks/use-admin-products';
 import { useCreateComboDeal, useUpdateComboDeal } from '@/hooks/use-admin-combo-deals';
-import { ApiError } from '@/lib/api-client';
 
 function toDefaultValues(comboDeal?: AdminComboDealDetail): ComboDealInput {
   if (!comboDeal) {
@@ -37,7 +34,6 @@ export function ComboDealForm({ comboDeal }: { comboDeal?: AdminComboDealDetail 
   const { data: products } = useAdminProducts({ page: 1, pageSize: 100 });
   const createComboDeal = useCreateComboDeal();
   const updateComboDeal = useUpdateComboDeal();
-  const [serverError, setServerError] = React.useState<string | null>(null);
 
   const {
     register,
@@ -52,7 +48,6 @@ export function ComboDealForm({ comboDeal }: { comboDeal?: AdminComboDealDetail 
   const itemsArray = useFieldArray({ control, name: 'items' });
 
   const onSubmit = handleSubmit(async (values) => {
-    setServerError(null);
     try {
       if (isEdit) {
         await updateComboDeal.mutateAsync({ id: comboDeal.id, input: values });
@@ -60,9 +55,8 @@ export function ComboDealForm({ comboDeal }: { comboDeal?: AdminComboDealDetail 
         await createComboDeal.mutateAsync(values);
       }
       router.push('/admin/combo-deals');
-      router.refresh();
-    } catch (error) {
-      setServerError(error instanceof ApiError ? error.message : 'Không thể lưu combo');
+    } catch {
+      // Error toast is surfaced by the mutation hook; stay on the form to retry.
     }
   });
 
@@ -70,8 +64,6 @@ export function ComboDealForm({ comboDeal }: { comboDeal?: AdminComboDealDetail 
 
   return (
     <form onSubmit={onSubmit} className="space-y-8" noValidate>
-      <FormError message={serverError} />
-
       <section className="grid gap-4 rounded-2xl border border-border bg-card p-6 sm:grid-cols-2">
         <div className="space-y-1.5">
           <Label htmlFor="name">Tên combo</Label>

@@ -2,6 +2,12 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Communication
+
+Always respond to the user in Vietnamese (trả lời người dùng bằng tiếng Việt). Code, code
+comments, identifiers, commit messages, and this file stay in their existing language (mostly
+English); only the conversational replies to the user are in Vietnamese.
+
 ## Project
 
 DauTayToy Store — an e-commerce platform for a children's toy store, built as a long-term
@@ -13,6 +19,12 @@ checkout, and two real payment gateways — VNPay and MoMo, both sandbox-only so
 Still planned but not built: Stripe as an additional payment gateway, and AI modules (image
 compression/background removal). See `docs/architecture.md` for the full log of architecture
 decisions and their rationale, and `docs/ERD.md` for the database diagram.
+
+**Deployed (as of 2026-07-18):** web on Vercel (`https://dautaytoy.vercel.app`) and API on Render
+(`https://dautaytoystore.onrender.com`, base path `/api`), DB on Supabase, Redis on Upstash, media
+on Cloudflare R2. Pushing to `main` (GitHub `Vulong112200/DauTayToyStore`) auto-deploys both; the
+Render deploy runs `prisma migrate deploy`. A QA/UX pass also shipped on this date — see
+`docs/architecture.md`'s "Admin & customer UX pass" section.
 
 ## Commands
 
@@ -236,12 +248,9 @@ integer math — no cents/decimal handling anywhere. Frontend formats via
 
 ## TODO before production deploy
 
-- **Apply the `OrderItem.flashSaleItemId` migration** (`prisma/migrations/
-  20260718000000_order_item_flash_sale_ref`) — a single nullable column added during the
-  system-wide bug-review pass so order cancellation can reverse `FlashSaleItem.soldCount`. It was
-  authored but **not** applied to the shared Supabase DB from that session; run `prisma migrate
-  deploy` (the Dockerfile/deploy already does this) before/at the next deploy. See
-  `docs/architecture.md`'s "System-wide bug-review pass" section.
+- ~~Apply the `OrderItem.flashSaleItemId` migration~~ **DONE (2026-07-18):** the migration
+  (`prisma/migrations/20260718000000_order_item_flash_sale_ref`) was applied to the shared Supabase
+  DB by the Render deploy's `prisma migrate deploy` step. No longer pending.
 - **Set `RESEND_API_KEY`/`EMAIL_FROM` on the Render deploy** — `EmailProcessor` now actually sends
   through Resend (`infra/email/resend-email.service.ts`) instead of only logging, but only once
   those two env vars are set; until then, sends are skipped with a logged warning rather than
@@ -263,9 +272,9 @@ integer math — no cents/decimal handling anywhere. Frontend formats via
   publicly reachable, TLS-valid host before the first sandbox transaction — MoMo won't reject a
   bad URL at request time, delivery just silently fails later. Until set, COD/VNPay checkout is
   unaffected but choosing MoMo at checkout fails with a clear error.
-- After fixing the above and actually deploying, **update this file's "Project" section and this
-  TODO list** to reflect the new state (remove fixed items, note the live deploy URLs/setup if
-  relevant) — don't leave stale TODOs here once they're done.
+- Live deploy URLs are now recorded in the "Project" section above. As the remaining items here
+  (email keys, admin password, VNPay/MoMo credentials) get done, **keep updating this list and the
+  "Project" section** — don't leave stale TODOs here once they're resolved.
 
 ## Supabase (alternative to local Postgres)
 
