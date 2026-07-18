@@ -35,10 +35,15 @@ export function buildConfiguration(env: EnvConfig) {
       from: env.EMAIL_FROM,
     },
     vnpay: {
-      tmnCode: env.VNPAY_TMN_CODE,
-      hashSecret: env.VNPAY_HASH_SECRET,
-      paymentUrl: env.VNPAY_PAYMENT_URL,
-      returnUrl: env.VNPAY_RETURN_URL,
+      // Trimmed defensively: a stray trailing newline/space pasted into the deploy dashboard's
+      // env var silently poisons the HMAC key (or the signed vnp_TmnCode/vnp_ReturnUrl value),
+      // and VNPay rejects the outbound payment URL with a bare "Sai chữ ký" that looks like a
+      // code bug. The secret in particular must be byte-for-byte the merchant's — trimming
+      // removes the single most common cause without affecting a correctly-set value.
+      tmnCode: env.VNPAY_TMN_CODE.trim(),
+      hashSecret: env.VNPAY_HASH_SECRET.trim(),
+      paymentUrl: env.VNPAY_PAYMENT_URL.trim(),
+      returnUrl: env.VNPAY_RETURN_URL.trim(),
     },
     momo: {
       partnerCode: env.MOMO_PARTNER_CODE,
