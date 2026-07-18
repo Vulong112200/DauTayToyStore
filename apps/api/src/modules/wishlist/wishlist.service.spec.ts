@@ -1,4 +1,5 @@
 import { NotFoundException } from '@nestjs/common';
+import { PromotionContextService } from '../../common/promotion-context/promotion-context.service';
 import { PrismaService } from '../../infra/prisma/prisma.service';
 import { WishlistService } from './wishlist.service';
 
@@ -9,6 +10,7 @@ describe('WishlistService', () => {
     wishlist: { upsert: jest.Mock };
     wishlistItem: { upsert: jest.Mock; deleteMany: jest.Mock; findMany: jest.Mock };
   };
+  let promotionContext: { loadFlashSaleItems: jest.Mock };
 
   const wishlist = { id: 'wishlist-1' };
 
@@ -22,7 +24,11 @@ describe('WishlistService', () => {
         findMany: jest.fn().mockResolvedValue([]),
       },
     };
-    service = new WishlistService(prisma as unknown as PrismaService);
+    promotionContext = { loadFlashSaleItems: jest.fn().mockResolvedValue([]) };
+    service = new WishlistService(
+      prisma as unknown as PrismaService,
+      promotionContext as unknown as PromotionContextService,
+    );
   });
 
   describe('addItem', () => {

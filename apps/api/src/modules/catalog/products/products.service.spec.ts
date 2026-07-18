@@ -1,5 +1,6 @@
 import { NotFoundException } from '@nestjs/common';
 import { ProductRelationType } from '@prisma/client';
+import { PromotionContextService } from '../../../common/promotion-context/promotion-context.service';
 import { PrismaService } from '../../../infra/prisma/prisma.service';
 import { ProductsService } from './products.service';
 
@@ -8,12 +9,17 @@ describe('ProductsService', () => {
   let prisma: {
     product: { findMany: jest.Mock; count: jest.Mock; findUnique: jest.Mock };
   };
+  let promotionContext: { loadFlashSaleItems: jest.Mock };
 
   beforeEach(() => {
     prisma = {
       product: { findMany: jest.fn(), count: jest.fn(), findUnique: jest.fn() },
     };
-    service = new ProductsService(prisma as unknown as PrismaService);
+    promotionContext = { loadFlashSaleItems: jest.fn().mockResolvedValue([]) };
+    service = new ProductsService(
+      prisma as unknown as PrismaService,
+      promotionContext as unknown as PromotionContextService,
+    );
   });
 
   describe('findList', () => {
@@ -50,6 +56,58 @@ describe('ProductsService', () => {
         inStock: true,
       });
       expect(result.meta).toEqual({ page: 1, pageSize: 20, totalItems: 1, totalPages: 1 });
+    });
+
+    it('attaches flash-sale pricing when the product is in an active in-stock flash sale', async () => {
+      prisma.product.findMany.mockResolvedValue([
+        {
+          id: 'p1',
+          slug: 'lego-city',
+          name: 'LEGO City',
+          price: 200000,
+          compareAtPrice: null,
+          avgRating: 0,
+          reviewCount: 0,
+          brand: null,
+          images: [],
+          inventory: { quantityOnHand: 10, quantityReserved: 0 },
+          variants: [],
+        },
+      ]);
+      prisma.product.count.mockResolvedValue(1);
+      promotionContext.loadFlashSaleItems.mockResolvedValue([
+        { productId: 'p1', salePrice: 150000, remainingStock: 5 },
+      ]);
+
+      const result = await service.findList({ page: 1, pageSize: 20, sort: 'newest' });
+
+      expect(result.items[0]?.flashSale).toEqual({ salePrice: 150000, discountPercent: 25 });
+    });
+
+    it('omits flash-sale pricing when the flash item is sold out', async () => {
+      prisma.product.findMany.mockResolvedValue([
+        {
+          id: 'p1',
+          slug: 'lego-city',
+          name: 'LEGO City',
+          price: 200000,
+          compareAtPrice: null,
+          avgRating: 0,
+          reviewCount: 0,
+          brand: null,
+          images: [],
+          inventory: { quantityOnHand: 10, quantityReserved: 0 },
+          variants: [],
+        },
+      ]);
+      prisma.product.count.mockResolvedValue(1);
+      promotionContext.loadFlashSaleItems.mockResolvedValue([
+        { productId: 'p1', salePrice: 150000, remainingStock: 0 },
+      ]);
+
+      const result = await service.findList({ page: 1, pageSize: 20, sort: 'newest' });
+
+      expect(result.items[0]?.flashSale).toBeNull();
     });
 
     it('marks a product out of stock when inventory is depleted and it has no variants', async () => {

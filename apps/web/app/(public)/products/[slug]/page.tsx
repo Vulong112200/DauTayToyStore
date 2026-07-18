@@ -75,14 +75,30 @@ export default async function ProductDetailPage({ params }: PageProps) {
             </div>
           )}
 
-          <div className="flex items-baseline gap-3">
-            <span className="font-display text-3xl font-bold text-primary">
-              {formatVnd(product.price)}
-            </span>
-            {product.compareAtPrice && (
-              <span className="text-lg text-muted-foreground line-through">
-                {formatVnd(product.compareAtPrice)}
-              </span>
+          <div className="flex flex-wrap items-baseline gap-3">
+            {product.flashSale ? (
+              <>
+                <span className="font-display text-3xl font-bold text-primary">
+                  {formatVnd(product.flashSale.salePrice)}
+                </span>
+                <span className="text-lg text-muted-foreground line-through">
+                  {formatVnd(product.price)}
+                </span>
+                <span className="rounded-full bg-primary px-2.5 py-1 text-sm font-bold text-primary-foreground">
+                  ⚡ -{product.flashSale.discountPercent}%
+                </span>
+              </>
+            ) : (
+              <>
+                <span className="font-display text-3xl font-bold text-primary">
+                  {formatVnd(product.price)}
+                </span>
+                {product.compareAtPrice && (
+                  <span className="text-lg text-muted-foreground line-through">
+                    {formatVnd(product.compareAtPrice)}
+                  </span>
+                )}
+              </>
             )}
           </div>
 
@@ -139,6 +155,7 @@ export default async function ProductDetailPage({ params }: PageProps) {
                   null,
                 brandName: product.brand?.name ?? null,
                 inStock: product.inStock,
+                flashSale: product.flashSale,
               }}
               className="static shadow-none border border-input"
             />

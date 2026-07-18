@@ -18,6 +18,16 @@ export const categoryTreeNodeSchema: z.ZodType<CategoryTreeNode> = categorySchem
   children: z.lazy(() => z.array(categoryTreeNodeSchema)),
 });
 
+// Flash-sale pricing attached to a product for display. `salePrice` is the active
+// flash sale's unit price (what the promotion engine will actually charge — same
+// source, so card and cart agree), `discountPercent` is derived vs the product's
+// normal price. Null when the product isn't in an active, in-stock flash sale.
+export const productFlashSaleSchema = z.object({
+  salePrice: z.number().int(),
+  discountPercent: z.number().int(),
+});
+export type ProductFlashSale = z.infer<typeof productFlashSaleSchema>;
+
 export const productListItemSchema = z.object({
   id: z.string().uuid(),
   slug: z.string(),
@@ -29,6 +39,7 @@ export const productListItemSchema = z.object({
   primaryImageUrl: z.string().nullable(),
   brandName: z.string().nullable(),
   inStock: z.boolean(),
+  flashSale: productFlashSaleSchema.nullable(),
 });
 export type ProductListItem = z.infer<typeof productListItemSchema>;
 
@@ -81,6 +92,7 @@ export const productDetailSchema = z.object({
   description: z.string().nullable(),
   price: z.number().int(),
   compareAtPrice: z.number().int().nullable(),
+  flashSale: productFlashSaleSchema.nullable(),
   material: z.string().nullable(),
   origin: z.string().nullable(),
   ageMin: z.number().int().nullable(),

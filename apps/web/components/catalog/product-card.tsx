@@ -26,11 +26,18 @@ export function ProductCard({ product }: { product: ProductListItem }) {
             🧸
           </div>
         )}
-        {!product.inStock && (
-          <span className="absolute left-2 top-2 rounded-full bg-destructive px-2 py-0.5 text-xs font-semibold text-destructive-foreground">
-            Hết hàng
-          </span>
-        )}
+        <div className="absolute left-2 top-2 flex flex-col items-start gap-1">
+          {product.flashSale && (
+            <span className="rounded-full bg-primary px-2 py-0.5 text-xs font-bold text-primary-foreground shadow-sm">
+              -{product.flashSale.discountPercent}%
+            </span>
+          )}
+          {!product.inStock && (
+            <span className="rounded-full bg-destructive px-2 py-0.5 text-xs font-semibold text-destructive-foreground">
+              Hết hàng
+            </span>
+          )}
+        </div>
         <WishlistButton product={product} className="absolute right-2 top-2" />
       </Link>
       <CardContent className="flex flex-1 flex-col gap-2 p-4">
@@ -50,13 +57,26 @@ export function ProductCard({ product }: { product: ProductListItem }) {
           </div>
         )}
         <div className="mt-auto flex items-baseline gap-2">
-          <span className="font-display text-base font-bold text-primary">
-            {formatVnd(product.price)}
-          </span>
-          {product.compareAtPrice && (
-            <span className="text-xs text-muted-foreground line-through">
-              {formatVnd(product.compareAtPrice)}
-            </span>
+          {product.flashSale ? (
+            <>
+              <span className="font-display text-base font-bold text-primary">
+                {formatVnd(product.flashSale.salePrice)}
+              </span>
+              <span className="text-xs text-muted-foreground line-through">
+                {formatVnd(product.price)}
+              </span>
+            </>
+          ) : (
+            <>
+              <span className="font-display text-base font-bold text-primary">
+                {formatVnd(product.price)}
+              </span>
+              {product.compareAtPrice && (
+                <span className="text-xs text-muted-foreground line-through">
+                  {formatVnd(product.compareAtPrice)}
+                </span>
+              )}
+            </>
           )}
         </div>
       </CardContent>

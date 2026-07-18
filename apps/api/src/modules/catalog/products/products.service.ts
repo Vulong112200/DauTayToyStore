@@ -6,16 +6,32 @@ import type {
   ProductListItem,
   ProductListQuery,
 } from '@repo/contracts';
+import { PromotionContextService } from '../../../common/promotion-context/promotion-context.service';
 import { PrismaService } from '../../../infra/prisma/prisma.service';
 import {
   PRODUCT_LIST_SELECT,
   isProductRowInStock,
+  resolveProductFlashSale,
   toProductListItem,
 } from './product-list.util';
 
 @Injectable()
 export class ProductsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly promotionContext: PromotionContextService,
+  ) {}
+
+  /** Loads the currently-active flash-sale item per product (same source the cart's
+   * promotion engine uses, so the badge price and the cart price can't disagree). If
+   * a product is in more than one active sale, last-wins — matching how
+   * `runPromotionEngine` de-dupes its own `flashByProduct` map. */
+  private async loadFlashSaleMap(
+    productIds: string[],
+  ): Promise<Map<string, { salePrice: number; remainingStock: number | null }>> {
+    const items = await this.promotionContext.loadFlashSaleItems(productIds);
+    return new Map(items.map((item) => [item.productId, item]));
+  }
 
   async findList(query: ProductListQuery): Promise<PaginatedResponse<ProductListItem>> {
     const where: Prisma.ProductWhereInput = {
@@ -61,8 +77,12 @@ export class ProductsService {
       this.prisma.product.count({ where }),
     ]);
 
+    const flashByProduct = await this.loadFlashSaleMap(rows.map((row) => row.id));
+
     return {
-      items: rows.map(toProductListItem),
+      items: rows.map((row) =>
+        toProductListItem(row, resolveProductFlashSale(row.price, flashByProduct.get(row.id))),
+      ),
       meta: {
         page: query.page,
         pageSize: query.pageSize,
@@ -97,10 +117,23 @@ export class ProductsService {
       throw new NotFoundException('Không tìm thấy sản phẩm');
     }
 
+    // One flash-sale lookup covering the main product AND every related/upsell/
+    // cross-sell card shown on the page.
+    const relatedProducts = product.relationsFrom.map((relation) => relation.related);
+    const flashByProduct = await this.loadFlashSaleMap([
+      product.id,
+      ...relatedProducts.map((related) => related.id),
+    ]);
+
     const relationsByType = (type: ProductRelationType): ProductListItem[] =>
       product.relationsFrom
         .filter((relation) => relation.type === type)
-        .map((relation) => toProductListItem(relation.related));
+        .map((relation) =>
+          toProductListItem(
+            relation.related,
+            resolveProductFlashSale(relation.related.price, flashByProduct.get(relation.related.id)),
+          ),
+        );
 
     return {
       id: product.id,
@@ -111,6 +144,7 @@ export class ProductsService {
       description: product.description,
       price: product.price,
       compareAtPrice: product.compareAtPrice,
+      flashSale: resolveProductFlashSale(product.price, flashByProduct.get(product.id)),
       material: product.material,
       origin: product.origin,
       ageMin: product.ageMin,

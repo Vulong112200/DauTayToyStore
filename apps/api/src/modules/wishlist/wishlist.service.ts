@@ -1,11 +1,19 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import type { AddWishlistItemInput, WishlistView } from '@repo/contracts';
-import { PRODUCT_LIST_SELECT, toProductListItem } from '../catalog/products/product-list.util';
+import {
+  PRODUCT_LIST_SELECT,
+  resolveProductFlashSale,
+  toProductListItem,
+} from '../catalog/products/product-list.util';
+import { PromotionContextService } from '../../common/promotion-context/promotion-context.service';
 import { PrismaService } from '../../infra/prisma/prisma.service';
 
 @Injectable()
 export class WishlistService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly promotionContext: PromotionContextService,
+  ) {}
 
   async getWishlist(userId: string): Promise<WishlistView> {
     const wishlist = await this.getOrCreateWishlist(userId);
@@ -55,11 +63,19 @@ export class WishlistService {
       include: { product: { select: PRODUCT_LIST_SELECT } },
     });
 
+    const flashItems = await this.promotionContext.loadFlashSaleItems(
+      items.map((item) => item.productId),
+    );
+    const flashByProduct = new Map(flashItems.map((flash) => [flash.productId, flash]));
+
     return {
       items: items.map((item) => ({
         productId: item.productId,
         addedAt: item.addedAt.toISOString(),
-        product: toProductListItem(item.product),
+        product: toProductListItem(
+          item.product,
+          resolveProductFlashSale(item.product.price, flashByProduct.get(item.productId)),
+        ),
       })),
     };
   }
