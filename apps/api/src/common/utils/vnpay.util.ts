@@ -13,10 +13,23 @@ export function encodeVnpayValue(value: string): string {
 
 /** Sorts keys, VNPay-encodes each value, and joins as `key=value&...` — the exact string VNPay
  * signs. Must be used identically when building an outbound request and when reconstructing
- * the string-to-sign from an inbound callback, or the HMAC will never match. */
+ * the string-to-sign from an inbound callback, or the HMAC will never match.
+ *
+ * Two rules that mirror VNPay's own reference signer exactly, both required or the HMAC silently
+ * diverges from theirs:
+ *   1. Empty/blank params are EXCLUDED from the signature. VNPay's callbacks (return URL + IPN)
+ *      routinely echo blank fields (e.g. `vnp_BankTranNo`/`vnp_CardType` are empty for some
+ *      response codes), and their reference code signs only non-empty values
+ *      (`if (fieldValue != null && fieldValue.length() > 0)`). Including `vnp_CardType=` in our
+ *      recomputed string while VNPay omitted it makes every such callback fail verification with
+ *      a bogus "sai chữ ký".
+ *   2. Keys are sorted by raw code-unit order (like PHP `ksort`/JS default sort), NOT
+ *      `localeCompare` — locale-aware collation can reorder keys under some ICU locales and would
+ *      no longer match VNPay's byte-order sort. */
 function buildSignableQueryString(params: Record<string, string>): string {
   return Object.entries(params)
-    .sort(([a], [b]) => a.localeCompare(b))
+    .filter(([, value]) => value !== undefined && value !== null && value !== '')
+    .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
     .map(([key, value]) => `${key}=${encodeVnpayValue(value)}`)
     .join('&');
 }

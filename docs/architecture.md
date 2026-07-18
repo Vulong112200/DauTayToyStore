@@ -1,5 +1,52 @@
 # Architecture Decisions
 
+## Phase 4+ — Admin & customer UX pass (2026-07-18)
+
+A QA audit of the admin panel and the customer site (no functional gaps found — the site was
+substantially complete) surfaced a cluster of **feedback/consistency** issues, fixed together and
+deployed to prod on the same date. Theme: the app had no way to tell the user *what happened* after
+an action (no toasts), and several states resolved to a dead-end (spinner-forever on error, empty
+screen on slow load, buttons that only 403).
+
+- **Toast layer (`sonner`).** There was no notification system at all — feedback was easy-to-miss
+  inline text. Added a theme-aware `<Toaster>` in the root layout (`components/ui/sonner.tsx`) plus
+  `lib/toast.ts` (`toastSuccess`/`toastError`, the latter pulling the message out of `ApiError`).
+  Wired into add-to-cart, wishlist, coupon/voucher, inventory, order-status, and the admin CRUD
+  hooks via two shared factories in `lib/admin-mutations.ts`: `deleteMutationCallbacks` (spread into
+  the delete hooks) and `writeMutationCallbacks` (spread into the create/update hooks). This closed
+  the "fire-and-forget delete swallows errors" bug — a failed/403 mutation now shows a toast instead
+  of a silent no-op. `writeMutationCallbacks` also fixes a stale-cache bug: an edit invalidated only
+  the list key, so the per-item detail query (`['admin-product', id]`, etc.), still "fresh" within
+  its 60s `staleTime`, kept serving pre-edit values when the edit page was reopened — it now
+  invalidates both the list key and the detail key with `refetchType: 'all'` (forcing even the
+  unmounted detail query to refetch, not just be marked stale).
+- **Admin query-error states.** Detail/dashboard pages gated on `isLoading || !data`, so a *query
+  error* (`isLoading` false, `data` undefined) hung on the loading text forever. Added an `isError`
+  branch rendering a shared `components/admin/admin-query-error.tsx` (message + retry) to all 7 such
+  pages, plus a framework `app/admin/error.tsx` boundary.
+- **Loading skeletons.** No `loading.tsx` existed anywhere, so slow navigations showed a blank
+  screen. Added route-level skeletons for `/products`, `/categories`, `/blog`, `/flash-sales`, and
+  `/admin/*` (base `components/ui/skeleton.tsx` + `catalog/product-card-skeleton.tsx`), and replaced
+  inline "Đang tải…" in cart/wishlist/order-history.
+- **Frontend RBAC hiding.** The admin frontend admitted STAFF everywhere and showed create/edit/
+  delete buttons the API restricts to ADMIN/SUPER_ADMIN — STAFF clicks just 403'd. Added
+  `lib/auth.ts#canManageContent` + `hooks/use-can-manage.ts` and hid those controls from STAFF
+  across the catalog/marketing/content/media admin pages. (Server-side enforcement was already
+  correct; this only aligns the UI.)
+- **Reports consistency (backend).** `AdminReportsService.topProducts` grouped over *all* order
+  items with no status/date filter, so it counted CANCELLED/REFUNDED and all-time orders — a single
+  product could report more "revenue" than the whole revenue panel. It now excludes
+  `EXCLUDED_REVENUE_STATUSES` and honours the same `from/to` range as `revenueOverTime`, and the
+  revenue series is **zero-filled** across the range so days with no orders aren't dropped. Verified
+  live: a top product's figure dropped from 12/10,680,000₫ to 7/6,230,000₫, now consistent.
+- **Stale payment copy.** The order-confirmation return banner hardcoded "VNPay" (wrong on a MoMo
+  return — the redirect carries only `paymentStatus`, no gateway id), reworded to gateway-agnostic;
+  the Terms page's "COD only" clause was corrected to COD + VNPay + MoMo.
+
+Deliberately **out of scope** (feature/decision, not bugs): wiring the Google-login button (dead
+client code exists), a Reports date-range/groupBy UI, the hardcoded "500.000₫" free-ship copy, and
+the money/security items already flagged under "Known behaviors left as-is" below.
+
 ## Phase 4+ — System-wide bug-review pass (logic + UI)
 
 A full audit of the platform (promotion engine, checkout/orders, payments, auth, contracts, and the
@@ -77,10 +124,10 @@ how-money-adds-up:
 - **`paymentMethodSchema`** intentionally exposes only `COD|VNPAY|MOMO` for checkout input though
   Prisma's `PaymentMethod` also has `BANK_TRANSFER|STRIPE`.
 
-> **Deploy note:** the `OrderItem.flashSaleItemId` migration
-> (`20260718000000_order_item_flash_sale_ref`) is a single nullable column and was authored but
-> **not applied** to the shared database from this working session — apply it via
-> `prisma migrate deploy` as part of the deploy.
+> **Deploy note (resolved 2026-07-18):** the `OrderItem.flashSaleItemId` migration
+> (`20260718000000_order_item_flash_sale_ref`, a single nullable column) has now been **applied**
+> to the shared Supabase database — the Render deploy's `prisma migrate deploy` step ran it. It is
+> no longer pending.
 
 ## Phase 4+ — Real demo catalog images provisioned through R2, and a data-driven home page
 
@@ -518,6 +565,16 @@ signature if the two sides used different encodings — this is the single most 
 VNPay integration bug. `vnp_CreateDate` is likewise always formatted in `Asia/Ho_Chi_Minh` (GMT+7)
 regardless of the server's own timezone (`formatVnpayCreateDate`), since VNPay validates against
 Vietnam's clock specifically.
+
+Two further rules in `buildSignableQueryString` mirror VNPay's reference signer exactly, and both
+were the cause of a real "sai chữ ký" bug on the callback path until fixed: (1) **empty/blank
+params are excluded from the signature** — VNPay's return-URL and IPN callbacks routinely echo
+blank fields (`vnp_BankTranNo`/`vnp_CardType` are empty for some response codes) and their signer
+only hashes non-empty values, so including `vnp_CardType=` in our recomputed string while VNPay
+omitted it made every such callback fail verification; (2) keys are sorted by raw code-unit order
+(matching PHP `ksort`), **not** `localeCompare`, which locale-aware collation could reorder. Both
+the outbound URL signer and the inbound verifier share this one function, so they can never
+disagree.
 
 ### Explicitly out of scope this pass
 

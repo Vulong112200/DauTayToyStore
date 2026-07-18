@@ -1,3 +1,4 @@
+import * as crypto from 'crypto';
 import { BadRequestException, InternalServerErrorException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { buildVnpaySecureHash, verifyVnpaySignature } from '../../common/utils/vnpay.util';
@@ -86,6 +87,44 @@ describe('VnpayService', () => {
       expect(result.responseCode).toBe('00');
       expect(result.amountVnd).toBe(100_000);
       expect(result.transactionNo).toBe('VNP987');
+    });
+
+    it('validates a callback that echoes empty fields (VNPay signs only non-empty params)', () => {
+      // VNPay's real return URL / IPN routinely includes blank fields (e.g. vnp_BankTranNo,
+      // vnp_CardType are empty for some response codes). VNPay's own reference signer EXCLUDES
+      // empty values from the hash, so we must too — otherwise every such callback fails with a
+      // bogus "sai chữ ký". This reproduces VNPay's side independently (not via our own signer)
+      // to guard against a regression that re-includes empty params.
+      const callbackFields: Record<string, string> = {
+        vnp_Amount: '10000000',
+        vnp_BankCode: 'NCB',
+        vnp_BankTranNo: '', // empty — VNPay omits this from its hash
+        vnp_CardType: '', // empty — VNPay omits this from its hash
+        vnp_OrderInfo: 'Thanh toan don hang DTT1',
+        vnp_PayDate: '20260718120000',
+        vnp_ResponseCode: '00',
+        vnp_TmnCode: 'DEMO001',
+        vnp_TransactionNo: 'VNP987',
+        vnp_TransactionStatus: '00',
+        vnp_TxnRef: 'DTT1',
+      };
+
+      // Hand-rolled VNPay-side hash: sort by code unit, drop empties, `+` for space, HMAC-SHA512.
+      const signable = Object.entries(callbackFields)
+        .filter(([, v]) => v !== '')
+        .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
+        .map(([k, v]) => `${k}=${encodeURIComponent(v).replace(/%20/g, '+')}`)
+        .join('&');
+      const vnp_SecureHash = crypto
+        .createHmac('sha512', HASH_SECRET)
+        .update(signable)
+        .digest('hex');
+
+      const result = service.parseAndVerifyCallback({ ...callbackFields, vnp_SecureHash });
+
+      expect(result.valid).toBe(true);
+      expect(result.orderNumber).toBe('DTT1');
+      expect(result.responseCode).toBe('00');
     });
   });
 });
