@@ -11,7 +11,10 @@ import { flashSalesApi } from '@/lib/api/flash-sales';
  */
 export async function FlashSaleHighlight() {
   const flashSales = await flashSalesApi.active().catch(() => []);
-  const featured = flashSales.find((sale) => sale.items.length > 0);
+  // Soonest-ending sale that actually has items — don't rely on the API's default ordering.
+  const featured = flashSales
+    .filter((sale) => sale.items.length > 0)
+    .sort((a, b) => new Date(a.endsAt).getTime() - new Date(b.endsAt).getTime())[0];
   if (!featured) return null;
 
   return (

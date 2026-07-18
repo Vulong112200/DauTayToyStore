@@ -1,7 +1,10 @@
 import type { Config } from 'tailwindcss';
 
 const config: Config = {
-  darkMode: ['class'],
+  // next-themes is configured with attribute="data-theme" (see theme-provider.tsx), so match
+  // that selector — a plain ['class'] expects a .dark class that never gets set, silently
+  // killing every Tailwind `dark:` utility.
+  darkMode: ['selector', '[data-theme="dark"]'],
   content: ['./app/**/*.{ts,tsx}', './components/**/*.{ts,tsx}', './lib/**/*.{ts,tsx}'],
   theme: {
     container: {

@@ -22,6 +22,17 @@ const imageUrlSchema = z
     message: 'URL ảnh không hợp lệ',
   });
 
+// Banner/link targets are overwhelmingly internal pages (/flash-sales, /products/x). A bare
+// z.string().url() rejects those root-relative paths and any surrounding whitespace, which
+// silently blocks the entire banner form from saving — the same class of bug fixed for image
+// fields above. Trim first, then accept a root-relative path or an absolute URL.
+const linkUrlSchema = z
+  .string()
+  .trim()
+  .refine((value) => value.startsWith('/') || z.string().url().safeParse(value).success, {
+    message: 'URL liên kết không hợp lệ',
+  });
+
 export const productStatusSchema = z.enum(['DRAFT', 'PUBLISHED', 'ARCHIVED']);
 export type ProductStatus = z.infer<typeof productStatusSchema>;
 
@@ -412,7 +423,7 @@ export type BannerPosition = z.infer<typeof bannerPositionSchema>;
 export const bannerInputSchema = z.object({
   title: z.string().min(2, 'Tiêu đề quá ngắn').max(150),
   imageUrl: imageUrlSchema,
-  linkUrl: z.string().url('URL liên kết không hợp lệ').optional(),
+  linkUrl: linkUrlSchema.optional(),
   position: bannerPositionSchema,
   sortOrder: z.coerce.number().int().default(0),
   isActive: z.boolean().default(true),

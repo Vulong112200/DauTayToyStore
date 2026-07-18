@@ -1,5 +1,87 @@
 # Architecture Decisions
 
+## Phase 4+ — System-wide bug-review pass (logic + UI)
+
+A full audit of the platform (promotion engine, checkout/orders, payments, auth, contracts, and the
+web UI) surfaced a batch of bugs; the fixes below were applied together. The unifying backend theme
+was **read-then-write races** — the payments module already demonstrated the correct
+compare-and-swap (`updateMany({ where: { status: 'PENDING' } })`) pattern, and it was extended to the
+other counters.
+
+### Concurrency fixes — compare-and-swap everywhere a counter gates behavior
+- **Order status transitions** (`AdminOrdersService.updateStatus`) now swap the status with
+  `tx.order.updateMany({ where: { id, status: <expected> } })` as the *first* step in the
+  transaction and abort (`ConflictException`) if `count === 0`. Previously two concurrent
+  `CANCELLED`/`SHIPPED` calls both passed the in-memory transition check and both ran the
+  inventory-release loop, double-decrementing stock into negative / phantom availability.
+- **Coupon `usageLimit`** (`OrdersService.checkout`) is now a conditional increment
+  (`updateMany` where `usageCount < usageLimit`), throwing if it matches zero rows — concurrent
+  checkouts of a single-use coupon can no longer all redeem it.
+- **Inventory reservation** (`OrdersService.checkout`) is now a raw conditional `UPDATE ... WHERE
+  quantityOnHand - quantityReserved >= qty` (Prisma's typed `where` can't compare two columns),
+  checked via affected-row count — closing the last-unit oversell race.
+
+### Cancellation now fully reverses what checkout consumed
+- Checkout records `OrderItem.flashSaleItemId` (new nullable soft-reference column, migration
+  `20260718000000_order_item_flash_sale_ref`) for flash-priced lines, so `CANCELLED` decrements
+  `FlashSaleItem.soldCount` back — previously cancelled/abandoned orders permanently burned a
+  sale's `stockLimit`.
+- `CANCELLED` also decrements the order's `Coupon.usageCount`, and the per-user coupon count at
+  checkout now excludes `CANCELLED` orders — so a cancelled order no longer locks a customer out
+  via `perUserLimit`.
+- Editing a flash sale (`AdminFlashSalesService.update`) now **diffs** items (delete only dropped
+  ones, upsert the rest by `(flashSaleId, productId)`) instead of delete-and-recreate, which had
+  silently reset every `soldCount` to 0 on any edit — even just a rename.
+
+### Other fixes
+- **Google login** now rejects `!isActive`, matching password login and token refresh.
+- **Banner `linkUrl`** contract accepts root-relative internal paths (`/flash-sales`) via a shared
+  `linkUrlSchema`, mirroring the earlier `imageUrlSchema` fix — a bare `z.string().url()` had
+  blocked the entire banner form from saving.
+- **Cart coupon/voucher codes** are `.trim()`-ed before uppercasing, matching how admin stores them.
+- **Checkout summary** now shows the gift-voucher discount and an explicit total line labeled as
+  excluding shipping (the button amount was previously less than the charged total with no
+  breakdown); **online-payment (VNPAY/MOMO)** now stashes the order to `sessionStorage` *before*
+  the gateway redirect, so returning customers see the itemized confirmation instead of a "not
+  found in this session" fallback.
+- **Homepage** `FeaturedProducts`/`CategoryHighlights` degrade gracefully on API error (matching
+  the flash-sale strip); product-detail **image gallery** thumbnails are now clickable; **mobile
+  search** was added to the header drawer.
+- Assorted hardening: `parsePageParam` guards negative/`NaN` `?page=` values; the product-sort
+  select is URL-controlled; Tailwind `darkMode` matches next-themes' `data-theme` attribute;
+  add-to-cart success auto-clears; admin product "primary image" is single-select; the flash-sale
+  form's datetime fields have a single source of truth (RHF-controlled ISO ↔ local display).
+
+### Known behaviors left as-is (flagged for a product decision, not changed)
+These are plausibly intentional; documented here rather than silently altering who-gets-what /
+how-money-adds-up:
+- **Gift vouchers are bearer instruments** — `CartService.redeemVoucher` ignores the voucher's
+  `recipientEmail`, so anyone with the code can spend it.
+- **Coupon `minOrderAmount` and the free-shipping threshold are measured on the post-promotion
+  subtotal** (after combo/BOGO and coupon), so stacked discounts can drop an order below either
+  threshold.
+- **Buy-X-Get-Y** same-product math and the cross-product "buy pool" accounting depend on how
+  `buyQuantity` is defined for admins; potential over-discount if configured as "units paid for"
+  rather than "total set size", and overlapping cross-product rules can share the same purchased
+  units.
+- **Refresh-token rotation** has no reuse-detection / family revocation, and a concurrent
+  double-refresh can mint two live tokens.
+- **`REFUNDED`** restores nothing (asymmetric with `CANCELLED`) — treats a refund as *not* implying
+  returned goods.
+- **`CartIdentityGuard`** trusts a signature-valid access token without a DB existence/active check
+  (short token TTL limits exposure).
+- **Order numbers** use an 8-char nanoid with no collision retry (astronomically unlikely, surfaces
+  as a checkout-failing unique-constraint error if it ever happens).
+- **Cross-field validation gaps** in admin contracts (`startsAt < endsAt`, `compareAtPrice >=
+  price`, `ageMin <= ageMax`) — no `.refine()` yet, so logically-invalid records are accepted.
+- **`paymentMethodSchema`** intentionally exposes only `COD|VNPAY|MOMO` for checkout input though
+  Prisma's `PaymentMethod` also has `BANK_TRANSFER|STRIPE`.
+
+> **Deploy note:** the `OrderItem.flashSaleItemId` migration
+> (`20260718000000_order_item_flash_sale_ref`) is a single nullable column and was authored but
+> **not applied** to the shared database from this working session — apply it via
+> `prisma migrate deploy` as part of the deploy.
+
 ## Phase 4+ — Real demo catalog images provisioned through R2, and a data-driven home page
 
 ### The broken images were placeholders returning SVG, which `next/image` refuses to optimize

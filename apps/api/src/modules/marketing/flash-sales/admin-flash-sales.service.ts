@@ -68,22 +68,31 @@ export class AdminFlashSalesService {
     await this.ensureExists(id);
 
     const flashSale = await this.prisma.$transaction(async (tx) => {
-      // Replace items wholesale — same rationale as admin-products' nested collections:
-      // simplest correct approach for an admin-managed list, avoiding per-row diffing.
-      await tx.flashSaleItem.deleteMany({ where: { flashSaleId: id } });
+      // Diff the items instead of replacing them wholesale: a wholesale delete+recreate would
+      // reset every row's soldCount to 0, silently un-selling exhausted flash stock on any edit
+      // (even just renaming the sale). Remove only items dropped from the sale, then upsert the
+      // rest by their (flashSaleId, productId) unique key so soldCount is preserved.
+      const keepProductIds = input.items.map((item) => item.productId);
+      await tx.flashSaleItem.deleteMany({
+        where: { flashSaleId: id, productId: { notIn: keepProductIds } },
+      });
+
+      for (const item of input.items) {
+        await tx.flashSaleItem.upsert({
+          where: { flashSaleId_productId: { flashSaleId: id, productId: item.productId } },
+          create: {
+            flashSaleId: id,
+            productId: item.productId,
+            salePrice: item.salePrice,
+            stockLimit: item.stockLimit,
+          },
+          update: { salePrice: item.salePrice, stockLimit: item.stockLimit },
+        });
+      }
 
       return tx.flashSale.update({
         where: { id },
-        data: {
-          ...this.toBaseData(input),
-          items: {
-            create: input.items.map((item) => ({
-              productId: item.productId,
-              salePrice: item.salePrice,
-              stockLimit: item.stockLimit,
-            })),
-          },
-        },
+        data: this.toBaseData(input),
         include: DETAIL_INCLUDE,
       });
     });

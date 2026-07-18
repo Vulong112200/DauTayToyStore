@@ -1,9 +1,9 @@
 import type { Metadata } from 'next';
-import Image from 'next/image';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { Star } from 'lucide-react';
 import { ProductCard } from '@/components/catalog/product-card';
+import { ProductGallery } from '@/components/catalog/product-gallery';
 import { AddToCartButton } from '@/components/cart/add-to-cart-button';
 import { WishlistButton } from '@/components/wishlist/wishlist-button';
 import { ApiError } from '@/lib/api-client';
@@ -41,8 +41,6 @@ export default async function ProductDetailPage({ params }: PageProps) {
   const product = await loadProduct(slug);
   if (!product) notFound();
 
-  const primaryImage = product.images[0];
-
   return (
     <section className="container py-12">
       <nav className="mb-6 text-sm text-muted-foreground" aria-label="Breadcrumb">
@@ -57,42 +55,7 @@ export default async function ProductDetailPage({ params }: PageProps) {
       </nav>
 
       <div className="grid gap-10 lg:grid-cols-2">
-        <div>
-          <div className="relative aspect-square overflow-hidden rounded-2xl bg-muted">
-            {primaryImage ? (
-              <Image
-                src={primaryImage.url}
-                alt={primaryImage.altText ?? product.name}
-                fill
-                sizes="(max-width: 1024px) 100vw, 50vw"
-                className="object-cover"
-                priority
-              />
-            ) : (
-              <div className="flex h-full items-center justify-center text-6xl" aria-hidden>
-                🧸
-              </div>
-            )}
-          </div>
-          {product.images.length > 1 && (
-            <div className="mt-3 grid grid-cols-5 gap-2">
-              {product.images.slice(0, 5).map((image) => (
-                <div
-                  key={image.id}
-                  className="relative aspect-square overflow-hidden rounded-lg bg-muted"
-                >
-                  <Image
-                    src={image.url}
-                    alt={image.altText ?? product.name}
-                    fill
-                    sizes="20vw"
-                    className="object-cover"
-                  />
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
+        <ProductGallery images={product.images} productName={product.name} />
 
         <div className="flex flex-col gap-4">
           {product.brand && (

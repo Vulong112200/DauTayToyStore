@@ -85,6 +85,8 @@ export function ProductForm({ product }: { product?: AdminProductDetail }) {
     register,
     control,
     handleSubmit,
+    setValue,
+    watch,
     formState: { errors },
   } = useForm<ProductInput>({
     resolver: zodResolver(productInputSchema),
@@ -141,7 +143,9 @@ export function ProductForm({ product }: { product?: AdminProductDetail }) {
           <select
             id="brandId"
             className="w-full rounded-xl border border-input bg-background px-4 py-2 text-sm"
-            {...register('brandId')}
+            {...register('brandId', {
+              setValueAs: (value: unknown) => (value === '' ? undefined : value),
+            })}
           >
             <option value="">-- Không có --</option>
             {brands?.map((brand) => (
@@ -278,8 +282,19 @@ export function ProductForm({ product }: { product?: AdminProductDetail }) {
                 />
               </div>
               <label className="flex shrink-0 items-center gap-1.5 text-xs text-muted-foreground">
-                <input type="checkbox" {...register(`images.${index}.isPrimary` as const)} /> Ảnh
-                chính
+                {/* Radio-style: exactly one image can be primary. A plain checkbox per row let
+                    an admin mark several, leaving which one wins undefined. */}
+                <input
+                  type="radio"
+                  name="primaryImage"
+                  checked={!!watch(`images.${index}.isPrimary`)}
+                  onChange={() =>
+                    imagesArray.fields.forEach((_, i) =>
+                      setValue(`images.${i}.isPrimary` as const, i === index),
+                    )
+                  }
+                />{' '}
+                Ảnh chính
               </label>
               <Button
                 type="button"

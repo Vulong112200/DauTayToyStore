@@ -24,7 +24,7 @@ export default function AdminDashboardPage() {
     <div className="space-y-8">
       <h1 className="font-display text-2xl font-bold">Tổng quan</h1>
 
-      {data.activeFlashSales.length > 0 && (
+      {(data.activeFlashSales?.length ?? 0) > 0 && (
         <Link
           href="/admin/flash-sales"
           className="block rounded-2xl border border-primary/30 bg-primary/10 p-5 transition-colors hover:bg-primary/15"

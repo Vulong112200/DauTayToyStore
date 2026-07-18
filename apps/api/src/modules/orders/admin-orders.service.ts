@@ -1,4 +1,9 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { OrderStatus, Prisma } from '@prisma/client';
 import type {
   AdminOrderListItem,
@@ -84,7 +89,11 @@ export class AdminOrdersService {
   async updateStatus(id: string, input: UpdateOrderStatusInput): Promise<OrderView> {
     const order = await this.prisma.order.findUnique({
       where: { id },
-      include: { items: { select: { productId: true, variantId: true, quantity: true } } },
+      include: {
+        items: {
+          select: { productId: true, variantId: true, quantity: true, flashSaleItemId: true },
+        },
+      },
     });
     if (!order) {
       throw new NotFoundException('Không tìm thấy đơn hàng');
@@ -98,6 +107,20 @@ export class AdminOrdersService {
     }
 
     await this.prisma.$transaction(async (tx) => {
+      // Compare-and-swap the status against the value we validated the transition from. If a
+      // concurrent updateStatus already moved the order on, count is 0 and we abort before
+      // touching inventory/counters — so the release loops below can never run twice for the
+      // same transition (which would double-decrement stock into negative / phantom availability).
+      const swapped = await tx.order.updateMany({
+        where: { id, status: order.status },
+        data: { status: input.status },
+      });
+      if (swapped.count === 0) {
+        throw new ConflictException(
+          'Trạng thái đơn hàng vừa được thay đổi bởi thao tác khác, vui lòng tải lại',
+        );
+      }
+
       if (input.status === OrderStatus.CANCELLED) {
         for (const item of order.items) {
           const where = item.variantId
@@ -107,6 +130,16 @@ export class AdminOrdersService {
             where,
             data: { quantityReserved: { decrement: item.quantity } },
           });
+
+          // Give back the flash-sale unit(s) this line consumed at checkout, so a
+          // cancelled/abandoned order doesn't permanently burn the sale's stockLimit.
+          // updateMany (not update) so it safely no-ops if the flash item was since removed.
+          if (item.flashSaleItemId) {
+            await tx.flashSaleItem.updateMany({
+              where: { id: item.flashSaleItemId },
+              data: { soldCount: { decrement: item.quantity } },
+            });
+          }
         }
 
         // Refund the voucher balance this order consumed — mirrors the inventory
@@ -115,6 +148,15 @@ export class AdminOrdersService {
           await tx.giftVoucher.update({
             where: { id: order.giftVoucherId },
             data: { balance: { increment: order.giftVoucherAmount }, redeemedAt: null },
+          });
+        }
+
+        // Release the global coupon use this order consumed at checkout — otherwise cancelled
+        // orders permanently burn a single-use coupon. Guard gt:0 so it can never go negative.
+        if (order.couponId) {
+          await tx.coupon.updateMany({
+            where: { id: order.couponId, usageCount: { gt: 0 } },
+            data: { usageCount: { decrement: 1 } },
           });
         }
       }
@@ -134,7 +176,6 @@ export class AdminOrdersService {
         }
       }
 
-      await tx.order.update({ where: { id }, data: { status: input.status } });
       await tx.orderStatusHistory.create({
         data: { orderId: id, status: input.status, note: input.note },
       });

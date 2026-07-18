@@ -5,6 +5,7 @@ import { ProductCard } from '@/components/catalog/product-card';
 import { ApiError } from '@/lib/api-client';
 import { categoriesApi } from '@/lib/api/categories';
 import { productsApi } from '@/lib/api/products';
+import { parsePageParam } from '@/lib/utils';
 
 interface PageProps {
   params: Promise<{ slug: string }>;
@@ -36,7 +37,7 @@ export default async function CategoryDetailPage({ params, searchParams }: PageP
   const category = await loadCategory(slug);
   if (!category) notFound();
 
-  const page = Number(pageParam ?? '1') || 1;
+  const page = parsePageParam(pageParam);
   const result = await productsApi.list({ categorySlug: slug, page, pageSize: 20 });
 
   return (

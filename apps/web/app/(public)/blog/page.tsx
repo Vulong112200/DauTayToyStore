@@ -3,6 +3,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { CatalogPagination } from '@/components/catalog/pagination';
 import { blogApi } from '@/lib/api/blog';
+import { parsePageParam } from '@/lib/utils';
 
 export const metadata: Metadata = {
   title: 'Blog',
@@ -15,7 +16,7 @@ interface PageProps {
 
 export default async function BlogPage({ searchParams }: PageProps) {
   const { page: pageParam } = await searchParams;
-  const page = Number(pageParam ?? '1') || 1;
+  const page = parsePageParam(pageParam);
   const result = await blogApi.list({ page, pageSize: 9 });
 
   return (

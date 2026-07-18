@@ -4,7 +4,9 @@ import { CategoryIcon } from '@/components/catalog/category-icon';
 import { categoriesApi } from '@/lib/api/categories';
 
 export async function CategoryHighlights() {
-  const categories = (await categoriesApi.tree()).slice(0, 5);
+  // Degrade gracefully on a transient API error instead of throwing the whole homepage to the
+  // error boundary — same resilience the flash-sale strip already has.
+  const categories = (await categoriesApi.tree().catch(() => [])).slice(0, 5);
 
   if (categories.length === 0) return null;
 

@@ -6,7 +6,7 @@ describe('AdminFlashSalesService', () => {
   let service: AdminFlashSalesService;
   let prisma: {
     flashSale: { findMany: jest.Mock; findUnique: jest.Mock; create: jest.Mock; delete: jest.Mock };
-    flashSaleItem: { deleteMany: jest.Mock };
+    flashSaleItem: { deleteMany: jest.Mock; upsert: jest.Mock };
     $transaction: jest.Mock;
   };
 
@@ -44,10 +44,13 @@ describe('AdminFlashSalesService', () => {
         create: jest.fn(),
         delete: jest.fn(),
       },
-      flashSaleItem: { deleteMany: jest.fn() },
+      flashSaleItem: { deleteMany: jest.fn(), upsert: jest.fn() },
       $transaction: jest.fn(async (callback: (tx: unknown) => unknown) =>
         callback({
-          flashSaleItem: { deleteMany: prisma.flashSaleItem.deleteMany },
+          flashSaleItem: {
+            deleteMany: prisma.flashSaleItem.deleteMany,
+            upsert: prisma.flashSaleItem.upsert,
+          },
           flashSale: { update: jest.fn().mockResolvedValue(flashSaleRow) },
         }),
       ),
@@ -101,13 +104,19 @@ describe('AdminFlashSalesService', () => {
       await expect(service.update('missing', input)).rejects.toThrow(NotFoundException);
     });
 
-    it('replaces items wholesale inside a transaction', async () => {
+    it('diffs items — removes only dropped ones and upserts the rest to preserve soldCount', async () => {
       prisma.flashSale.findUnique.mockResolvedValue({ id: 'fs1' });
 
       await service.update('fs1', input);
 
+      // Only items no longer in the sale are deleted; the ones that stay keep their soldCount.
       expect(prisma.flashSaleItem.deleteMany).toHaveBeenCalledWith({
-        where: { flashSaleId: 'fs1' },
+        where: { flashSaleId: 'fs1', productId: { notIn: ['p1'] } },
+      });
+      expect(prisma.flashSaleItem.upsert).toHaveBeenCalledWith({
+        where: { flashSaleId_productId: { flashSaleId: 'fs1', productId: 'p1' } },
+        create: { flashSaleId: 'fs1', productId: 'p1', salePrice: 90_000, stockLimit: undefined },
+        update: { salePrice: 90_000, stockLimit: undefined },
       });
     });
   });

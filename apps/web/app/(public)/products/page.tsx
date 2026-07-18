@@ -5,6 +5,7 @@ import { ProductCard } from '@/components/catalog/product-card';
 import { ProductSearchInput } from '@/components/catalog/product-search-input';
 import { ProductSortSelect } from '@/components/catalog/product-sort-select';
 import { productsApi } from '@/lib/api/products';
+import { parsePageParam } from '@/lib/utils';
 
 export const metadata: Metadata = {
   title: 'Sản phẩm',
@@ -23,7 +24,7 @@ function parseSort(value: string | undefined): ProductSort {
 
 export default async function ProductsPage({ searchParams }: PageProps) {
   const params = await searchParams;
-  const page = Number(params.page ?? '1') || 1;
+  const page = parsePageParam(params.page);
   const sort = parseSort(params.sort);
 
   const result = await productsApi.list({

@@ -20,11 +20,12 @@ describe('OrdersService', () => {
   let prisma: {
     cart: { findFirst: jest.Mock; update: jest.Mock };
     order: { create: jest.Mock; findMany: jest.Mock; findFirst: jest.Mock; count: jest.Mock };
-    coupon: { update: jest.Mock };
+    coupon: { updateMany: jest.Mock };
     giftVoucher: { findUnique: jest.Mock; update: jest.Mock };
     inventory: { updateMany: jest.Mock };
     cartItem: { deleteMany: jest.Mock };
     flashSaleItem: { findFirst: jest.Mock; update: jest.Mock };
+    $executeRaw: jest.Mock;
     $transaction: jest.Mock;
   };
 
@@ -63,20 +64,24 @@ describe('OrdersService', () => {
     prisma = {
       cart: { findFirst: jest.fn(), update: jest.fn() },
       order: { create: jest.fn(), findMany: jest.fn(), findFirst: jest.fn(), count: jest.fn() },
-      coupon: { update: jest.fn() },
+      coupon: { updateMany: jest.fn().mockResolvedValue({ count: 1 }) },
       giftVoucher: { findUnique: jest.fn(), update: jest.fn() },
       inventory: { updateMany: jest.fn() },
       cartItem: { deleteMany: jest.fn() },
       flashSaleItem: { findFirst: jest.fn(), update: jest.fn() },
+      // Inventory reservation is a raw conditional UPDATE returning the affected row count;
+      // default to a successful reserve (one row updated).
+      $executeRaw: jest.fn().mockResolvedValue(1),
       $transaction: jest.fn(async (callback: (tx: unknown) => unknown) =>
         callback({
           order: { create: prisma.order.create },
-          coupon: { update: prisma.coupon.update },
+          coupon: { updateMany: prisma.coupon.updateMany },
           giftVoucher: { findUnique: prisma.giftVoucher.findUnique, update: prisma.giftVoucher.update },
           inventory: { updateMany: prisma.inventory.updateMany },
           cartItem: { deleteMany: prisma.cartItem.deleteMany },
           cart: { update: prisma.cart.update },
           flashSaleItem: { findFirst: prisma.flashSaleItem.findFirst, update: prisma.flashSaleItem.update },
+          $executeRaw: prisma.$executeRaw,
         }),
       ),
     };
@@ -187,10 +192,10 @@ describe('OrdersService', () => {
           data: expect.objectContaining({ subtotal: 200000, shippingFee: 30000, total: 230000 }),
         }),
       );
-      expect(prisma.inventory.updateMany).toHaveBeenCalledWith({
-        where: { productId: 'p1' },
-        data: { quantityReserved: { increment: 2 } },
-      });
+      // Reservation is now a conditional raw UPDATE (compare-and-swap on free stock) rather than
+      // an unconditional inventory.updateMany. Assert on the interpolated values: [qty, productId, qty].
+      expect(prisma.$executeRaw).toHaveBeenCalled();
+      expect(prisma.$executeRaw.mock.calls[0]?.slice(1)).toEqual([2, 'p1', 2]);
       expect(prisma.cartItem.deleteMany).toHaveBeenCalledWith({ where: { cartId: 'cart-1' } });
       expect(result.order.orderNumber).toBe('DTT12345678');
       expect(result.order.items[0]?.productSlug).toBe('lego-city');
@@ -338,7 +343,8 @@ describe('OrdersService', () => {
           data: expect.objectContaining({ discountTotal: 20000, total: 210000, couponId: 'c1' }),
         }),
       );
-      expect(prisma.coupon.update).toHaveBeenCalledWith({
+      // Unlimited coupon (usageLimit null) → CAS where matches on id only.
+      expect(prisma.coupon.updateMany).toHaveBeenCalledWith({
         where: { id: 'c1' },
         data: { usageCount: { increment: 1 } },
       });
@@ -346,6 +352,47 @@ describe('OrdersService', () => {
         where: { id: 'cart-1' },
         data: { couponId: null, voucherId: null },
       });
+    });
+
+    it('rejects checkout when a usage-limited coupon is exhausted by a concurrent redemption', async () => {
+      prisma.cart.findFirst.mockResolvedValue({
+        ...cartWithItems([publishedItem()]),
+        coupon: {
+          id: 'c1',
+          type: 'FIXED_AMOUNT',
+          value: 20000,
+          isActive: true,
+          startsAt: null,
+          expiresAt: null,
+          minOrderAmount: null,
+          maxDiscountAmount: null,
+          usageLimit: 1,
+          usageCount: 0,
+          perUserLimit: null,
+        },
+      });
+      // The conditional increment matched zero rows — the last use was taken by another checkout.
+      prisma.coupon.updateMany.mockResolvedValue({ count: 0 });
+
+      await expect(service.checkout({ sessionId: 's1' }, checkoutInput)).rejects.toThrow(
+        BadRequestException,
+      );
+      expect(prisma.coupon.updateMany).toHaveBeenCalledWith({
+        where: { id: 'c1', usageCount: { lt: 1 } },
+        data: { usageCount: { increment: 1 } },
+      });
+    });
+
+    it('rejects checkout when the inventory reserve loses the compare-and-swap (oversell race)', async () => {
+      prisma.cart.findFirst.mockResolvedValue(cartWithItems([publishedItem()]));
+      // The conditional reserve matched zero rows — the last unit was taken concurrently.
+      prisma.$executeRaw.mockResolvedValue(0);
+
+      await expect(service.checkout({ sessionId: 's1' }, checkoutInput)).rejects.toThrow(
+        BadRequestException,
+      );
+      expect(prisma.order.create).toHaveBeenCalled();
+      expect(prisma.cartItem.deleteMany).not.toHaveBeenCalled();
     });
 
     it('throws BadRequestException when the applied coupon has expired by checkout time', async () => {

@@ -3,7 +3,11 @@ import { ProductCard } from '@/components/catalog/product-card';
 import { productsApi } from '@/lib/api/products';
 
 export async function FeaturedProducts() {
-  const { items } = await productsApi.list({ sort: 'rating', pageSize: 4 });
+  // Degrade gracefully on a transient API error instead of throwing the whole homepage to the
+  // error boundary — same resilience the flash-sale strip already has.
+  const { items } = await productsApi
+    .list({ sort: 'rating', pageSize: 4 })
+    .catch(() => ({ items: [] }));
 
   if (items.length === 0) return null;
 

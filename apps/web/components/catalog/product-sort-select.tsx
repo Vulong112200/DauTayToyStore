@@ -22,9 +22,16 @@ export function ProductSortSelect({ defaultValue }: { defaultValue: ProductSort 
     router.push(`${pathname}?${params.toString()}`);
   }
 
+  // Controlled from the URL so browser back/forward (or any external sort change) keeps the
+  // dropdown in sync — an uncontrolled defaultValue would drift out of agreement with the URL.
+  const sortParam = searchParams.get('sort');
+  const value = OPTIONS.some((option) => option.value === sortParam)
+    ? (sortParam as ProductSort)
+    : defaultValue;
+
   return (
     <select
-      defaultValue={defaultValue}
+      value={value}
       onChange={onChange}
       aria-label="Sắp xếp sản phẩm"
       className="rounded-xl border border-input bg-background px-3 py-2 text-sm"

@@ -127,8 +127,15 @@ export class OrdersService {
       // cart contents, the coupon's window, or its usage limit may have changed since.
       assertCouponGloballyUsable(cart.coupon, engineResult.netSubtotal);
       if (identity.userId) {
+        // Exclude CANCELLED orders — a cancelled order released everything it consumed
+        // (inventory, voucher, and the coupon usageCount, see AdminOrdersService.updateStatus),
+        // so it must not keep counting against this user's perUserLimit.
         const usedByUserCount = await this.prisma.order.count({
-          where: { couponId: cart.coupon.id, userId: identity.userId },
+          where: {
+            couponId: cart.coupon.id,
+            userId: identity.userId,
+            status: { not: 'CANCELLED' },
+          },
         });
         assertCouponUserUsable(cart.coupon, usedByUserCount);
       }
@@ -157,6 +164,11 @@ export class OrdersService {
     const total = netSubtotalAfterCoupon - voucherAmount + shippingFee;
 
     const order = await this.prisma.$transaction(async (tx) => {
+      // Records which flash-sale item each flash-priced product was charged against, so the
+      // per-line soldCount increment can be reversed if the order is later cancelled
+      // (AdminOrdersService.updateStatus) — mirrors how reserved inventory is released.
+      const flashItemByProduct = new Map<string, string>();
+
       // Guard flash-sale stock again inside the transaction against a last-instant race —
       // same pragmatic best-effort tradeoff as the inventory reservation below (no
       // SERIALIZABLE isolation), acceptable at this system's scale.
@@ -183,6 +195,7 @@ export class OrdersService {
           where: { id: flashItem.id },
           data: { soldCount: { increment: line.quantity } },
         });
+        flashItemByProduct.set(line.productId, flashItem.id);
       }
 
       // Re-check the voucher's balance inside the transaction against a last-instant race
@@ -228,32 +241,45 @@ export class OrdersService {
           shippingProvince: input.shippingProvince,
           shippingPostalCode: input.shippingPostalCode,
           note: input.note,
-          items: { create: lines },
+          items: {
+            create: lines.map((line) => ({
+              ...line,
+              flashSaleItemId: flashItemByProduct.get(line.productId) ?? null,
+            })),
+          },
           statusHistory: { create: [{ status: 'PENDING', note: 'Đơn hàng đã được tạo' }] },
           payment: { create: { method: input.paymentMethod, status: 'PENDING', amount: total } },
         },
         include: ORDER_VIEW_INCLUDE,
       });
 
+      // Reserve inventory with a conditional UPDATE (compare-and-swap): the row is only
+      // updated when it still has enough free stock (onHand - reserved >= qty). Prisma's
+      // typed `where` can't compare two columns, so this uses raw SQL and checks the affected
+      // row count — closing the oversell race where two concurrent checkouts of the last unit
+      // both pass the pre-transaction stock check and both reserve.
       for (const item of cart.items) {
-        if (item.variantId) {
-          await tx.inventory.updateMany({
-            where: { variantId: item.variantId },
-            data: { quantityReserved: { increment: item.quantity } },
-          });
-        } else {
-          await tx.inventory.updateMany({
-            where: { productId: item.productId },
-            data: { quantityReserved: { increment: item.quantity } },
-          });
+        const affected = item.variantId
+          ? await tx.$executeRaw`UPDATE "inventory" SET "quantityReserved" = "quantityReserved" + ${item.quantity} WHERE "variantId" = ${item.variantId} AND "quantityOnHand" - "quantityReserved" >= ${item.quantity}`
+          : await tx.$executeRaw`UPDATE "inventory" SET "quantityReserved" = "quantityReserved" + ${item.quantity} WHERE "productId" = ${item.productId} AND "quantityOnHand" - "quantityReserved" >= ${item.quantity}`;
+        if (affected === 0) {
+          throw new BadRequestException(`Sản phẩm "${item.product.name}" không đủ hàng trong kho`);
         }
       }
 
       if (cart.coupon) {
-        await tx.coupon.update({
-          where: { id: cart.coupon.id },
+        // Conditional increment (compare-and-swap): only bump usageCount while it's still
+        // below usageLimit, so concurrent checkouts of a single-use coupon can't all redeem it.
+        const couponUpdate = await tx.coupon.updateMany({
+          where:
+            cart.coupon.usageLimit === null
+              ? { id: cart.coupon.id }
+              : { id: cart.coupon.id, usageCount: { lt: cart.coupon.usageLimit } },
           data: { usageCount: { increment: 1 } },
         });
+        if (couponUpdate.count === 0) {
+          throw new BadRequestException('Mã giảm giá đã hết lượt sử dụng');
+        }
       }
 
       await tx.cartItem.deleteMany({ where: { cartId: cart.id } });

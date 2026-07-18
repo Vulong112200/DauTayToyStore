@@ -54,6 +54,7 @@ export type UpdateCartItemInput = z.infer<typeof updateCartItemSchema>;
 export const applyCartCouponSchema = z.object({
   code: z
     .string()
+    .trim()
     .min(3, 'Mã quá ngắn')
     .max(30)
     .transform((value) => value.toUpperCase()),
@@ -63,6 +64,7 @@ export type ApplyCartCouponInput = z.infer<typeof applyCartCouponSchema>;
 export const redeemGiftVoucherSchema = z.object({
   code: z
     .string()
+    .trim()
     .min(3, 'Mã quá ngắn')
     .max(30)
     .transform((value) => value.toUpperCase()),

@@ -163,6 +163,13 @@ export class AuthService {
       });
     }
 
+    // A deactivated account must not be able to sign in via Google either — password login
+    // (loginWithPassword) and token refresh both reject !isActive, so mirror that here rather
+    // than letting a banned user mint fresh refresh tokens and trigger a cart merge.
+    if (!user.isActive) {
+      throw new UnauthorizedException('Tài khoản đã bị vô hiệu hóa');
+    }
+
     await this.auditLogService.record({
       actorId: user.id,
       action: 'user.login.google',

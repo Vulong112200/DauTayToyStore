@@ -236,6 +236,12 @@ integer math — no cents/decimal handling anywhere. Frontend formats via
 
 ## TODO before production deploy
 
+- **Apply the `OrderItem.flashSaleItemId` migration** (`prisma/migrations/
+  20260718000000_order_item_flash_sale_ref`) — a single nullable column added during the
+  system-wide bug-review pass so order cancellation can reverse `FlashSaleItem.soldCount`. It was
+  authored but **not** applied to the shared Supabase DB from that session; run `prisma migrate
+  deploy` (the Dockerfile/deploy already does this) before/at the next deploy. See
+  `docs/architecture.md`'s "System-wide bug-review pass" section.
 - **Set `RESEND_API_KEY`/`EMAIL_FROM` on the Render deploy** — `EmailProcessor` now actually sends
   through Resend (`infra/email/resend-email.service.ts`) instead of only logging, but only once
   those two env vars are set; until then, sends are skipped with a logged warning rather than

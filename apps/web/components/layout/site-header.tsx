@@ -155,6 +155,25 @@ export function SiteHeader() {
         )}
       >
         <nav className="container flex flex-col gap-1 py-3" aria-label="Điều hướng di động">
+          {/* Search on phones — the top-bar search is hidden below md, so without this there's
+              no way to search products on a phone. md:hidden avoids duplicating it at md-lg. */}
+          <form
+            onSubmit={(event) => {
+              handleSearchSubmit(event);
+              setMobileOpen(false);
+            }}
+            className="mb-2 flex items-center rounded-lg border border-input bg-muted/50 px-3 py-2 md:hidden"
+          >
+            <Search className="mr-2 h-4 w-4 text-muted-foreground" aria-hidden />
+            <input
+              type="search"
+              value={searchTerm}
+              onChange={(event) => setSearchTerm(event.target.value)}
+              placeholder="Tìm đồ chơi cho bé..."
+              aria-label="Tìm kiếm sản phẩm"
+              className="w-full bg-transparent text-sm outline-none placeholder:text-muted-foreground"
+            />
+          </form>
           {NAV_LINKS.map((link) => (
             <Link
               key={link.href}

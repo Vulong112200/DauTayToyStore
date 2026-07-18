@@ -3,7 +3,7 @@
 import * as React from 'react';
 import { useRouter } from 'next/navigation';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useFieldArray, useForm } from 'react-hook-form';
+import { Controller, useFieldArray, useForm } from 'react-hook-form';
 import { Plus, Trash2 } from 'lucide-react';
 import {
   type AdminFlashSaleDetail,
@@ -18,20 +18,23 @@ import { useAdminProducts } from '@/hooks/use-admin-products';
 import { useCreateFlashSale, useUpdateFlashSale } from '@/hooks/use-admin-flash-sales';
 import { ApiError } from '@/lib/api-client';
 
-function toLocalInputValue(iso?: string): string | undefined {
-  if (!iso) return undefined;
+// Convert a stored ISO instant into the `YYYY-MM-DDTHH:mm` local-time string a datetime-local
+// input expects (for display only).
+function isoToLocalInputValue(iso?: string): string {
+  if (!iso) return '';
   const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return '';
   const offsetMs = date.getTimezoneOffset() * 60_000;
   return new Date(date.getTime() - offsetMs).toISOString().slice(0, 16);
 }
 
-const dateFieldOptions = {
-  setValueAs: (value: unknown) => {
-    if (!value || typeof value !== 'string') return undefined;
-    const date = new Date(value);
-    return Number.isNaN(date.getTime()) ? undefined : date.toISOString();
-  },
-};
+// Convert the datetime-local value (interpreted in the browser's local zone) back into an ISO
+// instant for the form/API. Done on every change so it can't be bypassed by an untouched field.
+function localInputValueToIso(value: string): string {
+  if (!value) return '';
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? '' : date.toISOString();
+}
 
 const optionalNumberOptions = {
   setValueAs: (value: unknown) => {
@@ -108,12 +111,18 @@ export function FlashSaleForm({ flashSale }: { flashSale?: AdminFlashSaleDetail 
         </div>
         <div className="space-y-1.5">
           <Label htmlFor="startsAt">Bắt đầu</Label>
-          <Input
-            id="startsAt"
-            type="datetime-local"
-            defaultValue={toLocalInputValue(flashSale?.startsAt)}
-            aria-invalid={!!errors.startsAt}
-            {...register('startsAt', dateFieldOptions)}
+          <Controller
+            control={control}
+            name="startsAt"
+            render={({ field }) => (
+              <Input
+                id="startsAt"
+                type="datetime-local"
+                value={isoToLocalInputValue(field.value)}
+                onChange={(event) => field.onChange(localInputValueToIso(event.target.value))}
+                aria-invalid={!!errors.startsAt}
+              />
+            )}
           />
           {errors.startsAt && (
             <p className="text-xs text-destructive">{errors.startsAt.message}</p>
@@ -121,12 +130,18 @@ export function FlashSaleForm({ flashSale }: { flashSale?: AdminFlashSaleDetail 
         </div>
         <div className="space-y-1.5">
           <Label htmlFor="endsAt">Kết thúc</Label>
-          <Input
-            id="endsAt"
-            type="datetime-local"
-            defaultValue={toLocalInputValue(flashSale?.endsAt)}
-            aria-invalid={!!errors.endsAt}
-            {...register('endsAt', dateFieldOptions)}
+          <Controller
+            control={control}
+            name="endsAt"
+            render={({ field }) => (
+              <Input
+                id="endsAt"
+                type="datetime-local"
+                value={isoToLocalInputValue(field.value)}
+                onChange={(event) => field.onChange(localInputValueToIso(event.target.value))}
+                aria-invalid={!!errors.endsAt}
+              />
+            )}
           />
           {errors.endsAt && <p className="text-xs text-destructive">{errors.endsAt.message}</p>}
         </div>

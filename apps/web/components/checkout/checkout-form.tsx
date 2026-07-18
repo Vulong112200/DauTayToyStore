@@ -36,11 +36,16 @@ export function CheckoutForm() {
     setServerError(null);
     try {
       const result = await checkout.mutateAsync(values);
+      // Stash the order snapshot for the confirmation page BEFORE any redirect. For online
+      // payment (VNPAY/MOMO) the browser leaves the SPA entirely and returns to
+      // /order-confirmation/[orderNumber]; without this the page finds nothing in session and
+      // falls back to "order not found in this session", so paying customers never see the
+      // itemized success card. sessionStorage survives the gateway round-trip in the same tab.
+      window.sessionStorage.setItem(LAST_ORDER_STORAGE_KEY, JSON.stringify(result.order));
       if (result.paymentUrl) {
         window.location.href = result.paymentUrl;
         return;
       }
-      window.sessionStorage.setItem(LAST_ORDER_STORAGE_KEY, JSON.stringify(result.order));
       router.push(`/order-confirmation/${result.order.orderNumber}`);
     } catch (error) {
       setServerError(error instanceof ApiError ? error.message : 'Không thể đặt hàng, vui lòng thử lại');
@@ -206,8 +211,21 @@ export function CheckoutForm() {
             </span>
           </div>
         )}
+        {cart.voucherDiscountTotal > 0 && (
+          <div className="mt-1 flex justify-between text-sm">
+            <span className="text-muted-foreground">Phiếu quà tặng</span>
+            <span className="font-medium text-destructive">
+              -{formatVnd(cart.voucherDiscountTotal)}
+            </span>
+          </div>
+        )}
+        <div className="mt-4 flex justify-between border-t border-border pt-4">
+          <span className="font-display font-bold">Tổng cộng (tạm tính)</span>
+          <span className="font-display font-bold text-primary">{formatVnd(cart.total)}</span>
+        </div>
         <p className="mt-2 text-xs text-muted-foreground">
-          Phí vận chuyển sẽ được tính khi bạn xác nhận đặt hàng (miễn phí cho đơn từ 500.000₫).
+          Chưa gồm phí vận chuyển — phí sẽ được tính khi bạn xác nhận đặt hàng (miễn phí cho đơn
+          từ 500.000₫).
         </p>
       </div>
     </div>

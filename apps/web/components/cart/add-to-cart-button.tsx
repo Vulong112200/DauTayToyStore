@@ -17,14 +17,21 @@ export function AddToCartButton({
   const [error, setError] = React.useState<string | null>(null);
   const [success, setSuccess] = React.useState(false);
   const addToCart = useAddToCart();
+  const successTimer = React.useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+
+  React.useEffect(() => () => clearTimeout(successTimer.current), []);
 
   async function handleAdd() {
     setError(null);
     // Show success immediately (the header badge also bumps optimistically) so
     // the click feels instant; roll it back if the request actually fails.
     setSuccess(true);
+    clearTimeout(successTimer.current);
     try {
       await addToCart.mutateAsync({ productId, quantity });
+      // Auto-clear so the confirmation doesn't linger forever (and doesn't stay showing
+      // after the user changes the quantity, implying the new amount was already added).
+      successTimer.current = setTimeout(() => setSuccess(false), 2500);
     } catch (err) {
       setSuccess(false);
       setError(err instanceof ApiError ? err.message : 'Không thể thêm vào giỏ hàng');
