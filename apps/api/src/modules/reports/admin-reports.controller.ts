@@ -29,8 +29,10 @@ export class AdminReportsController {
 
   @Get('top-products')
   @ApiOperation({ summary: '[Admin] Sản phẩm bán chạy nhất' })
-  topProducts(): Promise<TopProductReportItem[]> {
-    return this.adminReportsService.topProducts(10);
+  topProducts(
+    @Query(new ZodValidationPipe(reportRangeQuerySchema)) query: ReportRangeQuery,
+  ): Promise<TopProductReportItem[]> {
+    return this.adminReportsService.topProducts(query, 10);
   }
 
   @Get('order-status-breakdown')

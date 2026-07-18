@@ -3,6 +3,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { FlashSaleInput } from '@repo/contracts';
 import { adminFlashSalesApi } from '@/lib/api/admin/flash-sales';
+import { deleteMutationCallbacks } from '@/lib/admin-mutations';
 
 const LIST_KEY = 'admin-flash-sales';
 
@@ -39,6 +40,11 @@ export function useDeleteFlashSale() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (id: string) => adminFlashSalesApi.remove(id),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: [LIST_KEY] }),
+    ...deleteMutationCallbacks(
+      queryClient,
+      [LIST_KEY],
+      'Đã xoá flash sale',
+      'Không thể xoá flash sale',
+    ),
   });
 }

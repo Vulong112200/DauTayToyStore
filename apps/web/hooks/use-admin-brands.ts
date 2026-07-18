@@ -3,6 +3,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { BrandInput } from '@repo/contracts';
 import { adminBrandsApi } from '@/lib/api/admin/brands';
+import { deleteMutationCallbacks } from '@/lib/admin-mutations';
 
 const KEY = ['admin-brands'];
 
@@ -31,6 +32,6 @@ export function useDeleteBrand() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (id: string) => adminBrandsApi.remove(id),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: KEY }),
+    ...deleteMutationCallbacks(queryClient, KEY, 'Đã xoá thương hiệu', 'Không thể xoá thương hiệu'),
   });
 }

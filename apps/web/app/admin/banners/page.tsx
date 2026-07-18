@@ -12,6 +12,7 @@ import {
   useDeleteBanner,
   useUpdateBanner,
 } from '@/hooks/use-admin-banners';
+import { useCanManageContent } from '@/hooks/use-can-manage';
 import { ApiError } from '@/lib/api-client';
 
 const POSITION_LABELS: Record<string, string> = {
@@ -26,6 +27,7 @@ export default function AdminBannersPage() {
   const createBanner = useCreateBanner();
   const updateBanner = useUpdateBanner();
   const deleteBanner = useDeleteBanner();
+  const canManage = useCanManageContent();
 
   const [mode, setMode] = React.useState<'idle' | 'create' | string>('idle');
   const [error, setError] = React.useState<string | null>(null);
@@ -54,7 +56,7 @@ export default function AdminBannersPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="font-display text-2xl font-bold">Banner</h1>
-        {mode === 'idle' && (
+        {mode === 'idle' && canManage && (
           <Button size="sm" onClick={() => setMode('create')}>
             <Plus className="h-4 w-4" /> Thêm banner
           </Button>
@@ -113,29 +115,31 @@ export default function AdminBannersPage() {
                   </p>
                 </div>
               </div>
-              <div className="flex gap-1">
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  aria-label="Sửa banner"
-                  onClick={() => setMode(banner.id)}
-                >
-                  <Pencil className="h-4 w-4" />
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  aria-label="Xoá banner"
-                  disabled={deleteBanner.isPending}
-                  onClick={() => {
-                    if (window.confirm(`Xoá banner "${banner.title}"?`)) {
-                      deleteBanner.mutate(banner.id);
-                    }
-                  }}
-                >
-                  <Trash2 className="h-4 w-4" />
-                </Button>
-              </div>
+              {canManage && (
+                <div className="flex gap-1">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    aria-label="Sửa banner"
+                    onClick={() => setMode(banner.id)}
+                  >
+                    <Pencil className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    aria-label="Xoá banner"
+                    disabled={deleteBanner.isPending}
+                    onClick={() => {
+                      if (window.confirm(`Xoá banner "${banner.title}"?`)) {
+                        deleteBanner.mutate(banner.id);
+                      }
+                    }}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
+              )}
             </div>
           ),
         )}

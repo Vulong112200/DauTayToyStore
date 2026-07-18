@@ -3,9 +3,11 @@
 import * as React from 'react';
 import { useParams } from 'next/navigation';
 import type { OrderStatus } from '@repo/contracts';
+import { AdminQueryError } from '@/components/admin/admin-query-error';
 import { Button } from '@/components/ui/button';
 import { useAdminOrder, useUpdateOrderStatus } from '@/hooks/use-admin-orders';
 import { ApiError } from '@/lib/api-client';
+import { toastSuccess } from '@/lib/toast';
 import { ORDER_STATUS_LABELS } from '@/lib/order-status';
 import { formatVnd } from '@/lib/utils';
 
@@ -21,11 +23,15 @@ const STATUS_OPTIONS: OrderStatus[] = [
 
 export default function AdminOrderDetailPage() {
   const params = useParams<{ id: string }>();
-  const { data: order, isLoading } = useAdminOrder(params.id);
+  const { data: order, isLoading, isError, error: queryError, refetch } = useAdminOrder(params.id);
   const updateStatus = useUpdateOrderStatus();
   const [nextStatus, setNextStatus] = React.useState<OrderStatus | ''>('');
   const [note, setNote] = React.useState('');
   const [error, setError] = React.useState<string | null>(null);
+
+  if (isError) {
+    return <AdminQueryError error={queryError} onRetry={() => refetch()} />;
+  }
 
   if (isLoading || !order) {
     return <p className="text-muted-foreground">Đang tải...</p>;
@@ -41,6 +47,7 @@ export default function AdminOrderDetailPage() {
       });
       setNextStatus('');
       setNote('');
+      toastSuccess('Đã cập nhật trạng thái đơn hàng');
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Không thể cập nhật trạng thái');
     }

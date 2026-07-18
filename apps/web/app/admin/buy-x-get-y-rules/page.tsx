@@ -11,6 +11,7 @@ import {
   useDeleteBuyXGetYRule,
   useUpdateBuyXGetYRule,
 } from '@/hooks/use-admin-buy-x-get-y-rules';
+import { useCanManageContent } from '@/hooks/use-can-manage';
 import { ApiError } from '@/lib/api-client';
 
 export default function AdminBuyXGetYRulesPage() {
@@ -18,6 +19,7 @@ export default function AdminBuyXGetYRulesPage() {
   const createRule = useCreateBuyXGetYRule();
   const updateRule = useUpdateBuyXGetYRule();
   const deleteRule = useDeleteBuyXGetYRule();
+  const canManage = useCanManageContent();
 
   const [mode, setMode] = React.useState<'idle' | 'create' | string>('idle');
   const [error, setError] = React.useState<string | null>(null);
@@ -46,7 +48,7 @@ export default function AdminBuyXGetYRulesPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="font-display text-2xl font-bold">Mua X tặng Y</h1>
-        {mode === 'idle' && (
+        {mode === 'idle' && canManage && (
           <Button size="sm" onClick={() => setMode('create')}>
             <Plus className="h-4 w-4" /> Thêm chương trình
           </Button>
@@ -94,29 +96,31 @@ export default function AdminBuyXGetYRulesPage() {
                   {rule.getProductName} (giảm {rule.discountPercent}%)
                 </p>
               </div>
-              <div className="flex gap-1">
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  aria-label="Sửa chương trình"
-                  onClick={() => setMode(rule.id)}
-                >
-                  <Pencil className="h-4 w-4" />
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  aria-label="Xoá chương trình"
-                  disabled={deleteRule.isPending}
-                  onClick={() => {
-                    if (window.confirm(`Xoá chương trình "${rule.name}"?`)) {
-                      deleteRule.mutate(rule.id);
-                    }
-                  }}
-                >
-                  <Trash2 className="h-4 w-4" />
-                </Button>
-              </div>
+              {canManage && (
+                <div className="flex gap-1">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    aria-label="Sửa chương trình"
+                    onClick={() => setMode(rule.id)}
+                  >
+                    <Pencil className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    aria-label="Xoá chương trình"
+                    disabled={deleteRule.isPending}
+                    onClick={() => {
+                      if (window.confirm(`Xoá chương trình "${rule.name}"?`)) {
+                        deleteRule.mutate(rule.id);
+                      }
+                    }}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
+              )}
             </div>
           ),
         )}

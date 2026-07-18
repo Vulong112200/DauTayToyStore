@@ -11,6 +11,7 @@ import {
   useDeleteBrand,
   useUpdateBrand,
 } from '@/hooks/use-admin-brands';
+import { useCanManageContent } from '@/hooks/use-can-manage';
 import { ApiError } from '@/lib/api-client';
 
 export default function AdminBrandsPage() {
@@ -18,6 +19,7 @@ export default function AdminBrandsPage() {
   const createBrand = useCreateBrand();
   const updateBrand = useUpdateBrand();
   const deleteBrand = useDeleteBrand();
+  const canManage = useCanManageContent();
 
   const [mode, setMode] = React.useState<'idle' | 'create' | string>('idle');
   const [error, setError] = React.useState<string | null>(null);
@@ -46,7 +48,7 @@ export default function AdminBrandsPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="font-display text-2xl font-bold">Thương hiệu</h1>
-        {mode === 'idle' && (
+        {mode === 'idle' && canManage && (
           <Button size="sm" onClick={() => setMode('create')}>
             <Plus className="h-4 w-4" /> Thêm thương hiệu
           </Button>
@@ -91,29 +93,31 @@ export default function AdminBrandsPage() {
                 </p>
                 <p className="text-xs text-muted-foreground">/{brand.slug}</p>
               </div>
-              <div className="flex gap-1">
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  aria-label="Sửa thương hiệu"
-                  onClick={() => setMode(brand.id)}
-                >
-                  <Pencil className="h-4 w-4" />
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  aria-label="Xoá thương hiệu"
-                  disabled={deleteBrand.isPending}
-                  onClick={() => {
-                    if (window.confirm(`Xoá thương hiệu "${brand.name}"?`)) {
-                      deleteBrand.mutate(brand.id);
-                    }
-                  }}
-                >
-                  <Trash2 className="h-4 w-4" />
-                </Button>
-              </div>
+              {canManage && (
+                <div className="flex gap-1">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    aria-label="Sửa thương hiệu"
+                    onClick={() => setMode(brand.id)}
+                  >
+                    <Pencil className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    aria-label="Xoá thương hiệu"
+                    disabled={deleteBrand.isPending}
+                    onClick={() => {
+                      if (window.confirm(`Xoá thương hiệu "${brand.name}"?`)) {
+                        deleteBrand.mutate(brand.id);
+                      }
+                    }}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
+              )}
             </div>
           ),
         )}

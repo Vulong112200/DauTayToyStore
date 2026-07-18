@@ -3,6 +3,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { AdminProductQuery, ProductInput } from '@repo/contracts';
 import { adminProductsApi } from '@/lib/api/admin/products';
+import { deleteMutationCallbacks } from '@/lib/admin-mutations';
 
 const LIST_KEY = 'admin-products';
 
@@ -42,6 +43,11 @@ export function useDeleteProduct() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (id: string) => adminProductsApi.remove(id),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: [LIST_KEY] }),
+    ...deleteMutationCallbacks(
+      queryClient,
+      [LIST_KEY],
+      'Đã lưu trữ sản phẩm',
+      'Không thể lưu trữ sản phẩm',
+    ),
   });
 }

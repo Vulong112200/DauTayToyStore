@@ -40,14 +40,31 @@ export class AdminReportsService {
       buckets.set(key, existing);
     }
 
-    return Array.from(buckets.entries())
-      .map(([bucket, value]) => ({ bucket, ...value }))
-      .sort((a, b) => a.bucket.localeCompare(b.bucket));
+    // Zero-fill every bucket in the range so the daily/monthly series is
+    // contiguous — days with no orders would otherwise be dropped, leaving gaps
+    // in the chart/table. enumerateBuckets returns keys already in chronological
+    // order, so no separate sort is needed.
+    return this.enumerateBuckets(from, to, query.groupBy).map((bucket) => ({
+      bucket,
+      ...(buckets.get(bucket) ?? { revenue: 0, orderCount: 0 }),
+    }));
   }
 
-  async topProducts(limit: number): Promise<TopProductReportItem[]> {
+  async topProducts(query: ReportRangeQuery, limit: number): Promise<TopProductReportItem[]> {
+    const { from, to } = this.resolveRange(query);
+
+    // Must mirror revenueOverTime's definition of "revenue": exclude
+    // CANCELLED/REFUNDED orders and honour the same date range. Otherwise the two
+    // Reports panels contradict each other (top-products used to count every
+    // order item ever, including cancelled ones, with no date bound).
     const grouped = await this.prisma.orderItem.groupBy({
       by: ['productId'],
+      where: {
+        order: {
+          status: { notIn: EXCLUDED_REVENUE_STATUSES },
+          createdAt: { gte: from, lte: to },
+        },
+      },
       _sum: { quantity: true, lineTotal: true },
       orderBy: { _sum: { lineTotal: 'desc' } },
       take: limit,
@@ -86,5 +103,32 @@ export class AdminReportsService {
       ? new Date(query.from)
       : new Date(to.getTime() - DEFAULT_RANGE_DAYS * 24 * 60 * 60 * 1000);
     return { from, to };
+  }
+
+  /**
+   * Every bucket key between `from` and `to` (inclusive), in chronological order,
+   * using the same UTC-based key format as `bucketKey` so zero-filling lines up
+   * with the real data buckets.
+   */
+  private enumerateBuckets(from: Date, to: Date, groupBy: 'day' | 'month'): string[] {
+    const keys: string[] = [];
+    if (groupBy === 'month') {
+      const cursor = new Date(Date.UTC(from.getUTCFullYear(), from.getUTCMonth(), 1));
+      const end = new Date(Date.UTC(to.getUTCFullYear(), to.getUTCMonth(), 1));
+      while (cursor <= end) {
+        keys.push(cursor.toISOString().slice(0, 7));
+        cursor.setUTCMonth(cursor.getUTCMonth() + 1);
+      }
+    } else {
+      const cursor = new Date(
+        Date.UTC(from.getUTCFullYear(), from.getUTCMonth(), from.getUTCDate()),
+      );
+      const end = new Date(Date.UTC(to.getUTCFullYear(), to.getUTCMonth(), to.getUTCDate()));
+      while (cursor <= end) {
+        keys.push(cursor.toISOString().slice(0, 10));
+        cursor.setUTCDate(cursor.getUTCDate() + 1);
+      }
+    }
+    return keys;
   }
 }

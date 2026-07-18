@@ -36,11 +36,34 @@ describe('AdminReportsService', () => {
         { createdAt: new Date('2026-01-02T09:00:00.000Z'), total: 200_000 },
       ]);
 
-      const result = await service.revenueOverTime({ groupBy: 'day' });
+      const result = await service.revenueOverTime({
+        groupBy: 'day',
+        from: '2026-01-01T00:00:00.000Z',
+        to: '2026-01-02T00:00:00.000Z',
+      });
 
       expect(result).toEqual([
         { bucket: '2026-01-01', revenue: 150_000, orderCount: 2 },
         { bucket: '2026-01-02', revenue: 200_000, orderCount: 1 },
+      ]);
+    });
+
+    it('zero-fills days that had no orders so the series is contiguous', async () => {
+      prisma.order.findMany.mockResolvedValue([
+        { createdAt: new Date('2026-01-01T10:00:00.000Z'), total: 100_000 },
+        { createdAt: new Date('2026-01-03T09:00:00.000Z'), total: 200_000 },
+      ]);
+
+      const result = await service.revenueOverTime({
+        groupBy: 'day',
+        from: '2026-01-01T00:00:00.000Z',
+        to: '2026-01-03T00:00:00.000Z',
+      });
+
+      expect(result).toEqual([
+        { bucket: '2026-01-01', revenue: 100_000, orderCount: 1 },
+        { bucket: '2026-01-02', revenue: 0, orderCount: 0 },
+        { bucket: '2026-01-03', revenue: 200_000, orderCount: 1 },
       ]);
     });
 
@@ -51,7 +74,11 @@ describe('AdminReportsService', () => {
         { createdAt: new Date('2026-02-01T00:00:00.000Z'), total: 100_000 },
       ]);
 
-      const result = await service.revenueOverTime({ groupBy: 'month' });
+      const result = await service.revenueOverTime({
+        groupBy: 'month',
+        from: '2026-01-01T00:00:00.000Z',
+        to: '2026-02-01T00:00:00.000Z',
+      });
 
       expect(result).toEqual([
         { bucket: '2026-01', revenue: 200_000, orderCount: 2 },
@@ -64,10 +91,27 @@ describe('AdminReportsService', () => {
     it('returns an empty array without querying products when there are no order items', async () => {
       prisma.orderItem.groupBy.mockResolvedValue([]);
 
-      const result = await service.topProducts(10);
+      const result = await service.topProducts({ groupBy: 'day' }, 10);
 
       expect(result).toEqual([]);
       expect(prisma.product.findMany).not.toHaveBeenCalled();
+    });
+
+    it('excludes cancelled/refunded orders and honours the date range (consistent with revenue)', async () => {
+      prisma.orderItem.groupBy.mockResolvedValue([]);
+
+      await service.topProducts(
+        { groupBy: 'day', from: '2026-01-01T00:00:00.000Z', to: '2026-01-31T00:00:00.000Z' },
+        10,
+      );
+
+      const [args] = prisma.orderItem.groupBy.mock.calls[0];
+      expect(args.where.order.status.notIn).toEqual([
+        OrderStatus.CANCELLED,
+        OrderStatus.REFUNDED,
+      ]);
+      expect(args.where.order.createdAt.gte).toEqual(new Date('2026-01-01T00:00:00.000Z'));
+      expect(args.where.order.createdAt.lte).toEqual(new Date('2026-01-31T00:00:00.000Z'));
     });
 
     it('joins current product names onto the grouped totals', async () => {
@@ -76,7 +120,7 @@ describe('AdminReportsService', () => {
       ]);
       prisma.product.findMany.mockResolvedValue([{ id: 'p1', name: 'LEGO City' }]);
 
-      const result = await service.topProducts(10);
+      const result = await service.topProducts({ groupBy: 'day' }, 10);
 
       expect(result).toEqual([
         { productId: 'p1', productName: 'LEGO City', quantitySold: 5, revenue: 500_000 },
@@ -89,7 +133,7 @@ describe('AdminReportsService', () => {
       ]);
       prisma.product.findMany.mockResolvedValue([]);
 
-      const result = await service.topProducts(10);
+      const result = await service.topProducts({ groupBy: 'day' }, 10);
 
       expect(result[0]?.productName).toBe('(Sản phẩm đã bị xoá)');
     });

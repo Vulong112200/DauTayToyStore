@@ -5,6 +5,7 @@ import { Minus, Plus, ShoppingCart } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAddToCart } from '@/hooks/use-cart';
 import { ApiError } from '@/lib/api-client';
+import { toastError } from '@/lib/toast';
 
 export function AddToCartButton({
   productId,
@@ -35,6 +36,7 @@ export function AddToCartButton({
     } catch (err) {
       setSuccess(false);
       setError(err instanceof ApiError ? err.message : 'Không thể thêm vào giỏ hàng');
+      toastError(err, 'Không thể thêm vào giỏ hàng');
     }
   }
 

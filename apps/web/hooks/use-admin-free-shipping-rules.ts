@@ -3,6 +3,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { FreeShippingRuleInput } from '@repo/contracts';
 import { adminFreeShippingRulesApi } from '@/lib/api/admin/free-shipping-rules';
+import { deleteMutationCallbacks } from '@/lib/admin-mutations';
 
 const LIST_KEY = 'admin-free-shipping-rules';
 
@@ -31,6 +32,11 @@ export function useDeleteFreeShippingRule() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (id: string) => adminFreeShippingRulesApi.remove(id),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: [LIST_KEY] }),
+    ...deleteMutationCallbacks(
+      queryClient,
+      [LIST_KEY],
+      'Đã xoá quy tắc miễn phí vận chuyển',
+      'Không thể xoá quy tắc miễn phí vận chuyển',
+    ),
   });
 }

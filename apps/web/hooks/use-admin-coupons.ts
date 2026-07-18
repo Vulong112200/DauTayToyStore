@@ -3,6 +3,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { AdminCouponQuery, CouponInput } from '@repo/contracts';
 import { adminCouponsApi } from '@/lib/api/admin/coupons';
+import { deleteMutationCallbacks } from '@/lib/admin-mutations';
 
 const LIST_KEY = 'admin-coupons';
 
@@ -34,6 +35,11 @@ export function useDeleteCoupon() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (id: string) => adminCouponsApi.remove(id),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: [LIST_KEY] }),
+    ...deleteMutationCallbacks(
+      queryClient,
+      [LIST_KEY],
+      'Đã xoá mã giảm giá',
+      'Không thể xoá mã giảm giá',
+    ),
   });
 }

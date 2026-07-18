@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { Skeleton } from '@/components/ui/skeleton';
 import { useMyOrders } from '@/hooks/use-orders';
 import { ORDER_STATUS_LABELS } from '@/lib/order-status';
 import { formatVnd } from '@/lib/utils';
@@ -8,7 +9,15 @@ import { formatVnd } from '@/lib/utils';
 export function OrderHistoryList() {
   const { data: orders, isLoading } = useMyOrders(true);
 
-  if (isLoading) return <p className="text-sm text-muted-foreground">Đang tải...</p>;
+  if (isLoading) {
+    return (
+      <div className="space-y-3">
+        {Array.from({ length: 3 }).map((_, index) => (
+          <Skeleton key={index} className="h-20 w-full rounded-2xl" />
+        ))}
+      </div>
+    );
+  }
 
   if (!orders || orders.length === 0) {
     return <p className="text-sm text-muted-foreground">Bạn chưa có đơn hàng nào.</p>;

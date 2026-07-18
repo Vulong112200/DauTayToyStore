@@ -15,7 +15,9 @@ import {
   useRemoveVoucher,
   useUpdateCartItem,
 } from '@/hooks/use-cart';
+import { Skeleton } from '@/components/ui/skeleton';
 import { ApiError } from '@/lib/api-client';
+import { toastError, toastSuccess } from '@/lib/toast';
 import { formatVnd } from '@/lib/utils';
 
 export function CartView() {
@@ -38,6 +40,7 @@ export function CartView() {
     try {
       await applyCoupon.mutateAsync({ code: couponCode });
       setCouponCode('');
+      toastSuccess('Đã áp dụng mã giảm giá');
     } catch (error) {
       setCouponError(error instanceof ApiError ? error.message : 'Không thể áp dụng mã giảm giá');
     }
@@ -49,13 +52,23 @@ export function CartView() {
     try {
       await redeemVoucher.mutateAsync({ code: voucherCode });
       setVoucherCode('');
+      toastSuccess('Đã áp dụng phiếu quà tặng');
     } catch (error) {
       setVoucherError(error instanceof ApiError ? error.message : 'Không thể áp dụng phiếu quà tặng');
     }
   }
 
   if (isLoading) {
-    return <p className="text-muted-foreground">Đang tải giỏ hàng...</p>;
+    return (
+      <div className="grid gap-8 lg:grid-cols-3">
+        <div className="space-y-4 lg:col-span-2">
+          {Array.from({ length: 3 }).map((_, index) => (
+            <Skeleton key={index} className="h-28 w-full rounded-2xl" />
+          ))}
+        </div>
+        <Skeleton className="h-64 w-full rounded-2xl" />
+      </div>
+    );
   }
 
   if (!cart || cart.items.length === 0) {
@@ -114,10 +127,13 @@ export function CartView() {
                     title="Giảm số lượng"
                     disabled={updateItem.isPending || item.quantity <= 1}
                     onClick={() =>
-                      updateItem.mutate({
-                        itemId: item.id,
-                        input: { quantity: item.quantity - 1 },
-                      })
+                      updateItem.mutate(
+                        {
+                          itemId: item.id,
+                          input: { quantity: item.quantity - 1 },
+                        },
+                        { onError: (error) => toastError(error, 'Không thể cập nhật số lượng') },
+                      )
                     }
                   >
                     <Minus className="h-3.5 w-3.5" />
@@ -130,10 +146,13 @@ export function CartView() {
                     title="Tăng số lượng"
                     disabled={updateItem.isPending || item.quantity >= item.availableStock}
                     onClick={() =>
-                      updateItem.mutate({
-                        itemId: item.id,
-                        input: { quantity: item.quantity + 1 },
-                      })
+                      updateItem.mutate(
+                        {
+                          itemId: item.id,
+                          input: { quantity: item.quantity + 1 },
+                        },
+                        { onError: (error) => toastError(error, 'Không thể cập nhật số lượng') },
+                      )
                     }
                   >
                     <Plus className="h-3.5 w-3.5" />
@@ -142,7 +161,11 @@ export function CartView() {
                 <button
                   type="button"
                   className="flex items-center gap-1 text-sm text-destructive hover:underline disabled:opacity-50"
-                  onClick={() => removeItem.mutate(item.id)}
+                  onClick={() =>
+                    removeItem.mutate(item.id, {
+                      onError: (error) => toastError(error, 'Không thể xoá sản phẩm'),
+                    })
+                  }
                   disabled={removeItem.isPending}
                 >
                   <Trash2 className="h-3.5 w-3.5" /> Xoá
@@ -186,7 +209,11 @@ export function CartView() {
               type="button"
               className="text-destructive hover:underline disabled:opacity-50"
               disabled={removeCoupon.isPending}
-              onClick={() => removeCoupon.mutate()}
+              onClick={() =>
+                removeCoupon.mutate(undefined, {
+                  onError: (error) => toastError(error, 'Không thể gỡ mã giảm giá'),
+                })
+              }
             >
               Gỡ mã
             </button>
@@ -229,7 +256,11 @@ export function CartView() {
               type="button"
               className="text-destructive hover:underline disabled:opacity-50"
               disabled={removeVoucher.isPending}
-              onClick={() => removeVoucher.mutate()}
+              onClick={() =>
+                removeVoucher.mutate(undefined, {
+                  onError: (error) => toastError(error, 'Không thể gỡ phiếu quà tặng'),
+                })
+              }
             >
               Gỡ phiếu
             </button>

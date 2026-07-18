@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { Plus, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAdminProducts, useDeleteProduct } from '@/hooks/use-admin-products';
+import { useCanManageContent } from '@/hooks/use-can-manage';
 import { formatVnd } from '@/lib/utils';
 
 const STATUS_LABELS: Record<string, string> = {
@@ -18,16 +19,19 @@ export default function AdminProductsPage() {
   const [q, setQ] = React.useState('');
   const { data, isLoading } = useAdminProducts({ page, pageSize: 20, q: q || undefined });
   const deleteProduct = useDeleteProduct();
+  const canManage = useCanManageContent();
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="font-display text-2xl font-bold">Sản phẩm</h1>
-        <Button asChild>
-          <Link href="/admin/products/new">
-            <Plus className="h-4 w-4" /> Thêm sản phẩm
-          </Link>
-        </Button>
+        {canManage && (
+          <Button asChild>
+            <Link href="/admin/products/new">
+              <Plus className="h-4 w-4" /> Thêm sản phẩm
+            </Link>
+          </Button>
+        )}
       </div>
 
       <input
@@ -79,19 +83,21 @@ export default function AdminProductsPage() {
                     <td className="p-4">{product.quantityOnHand ?? '—'}</td>
                     <td className="p-4 text-right font-semibold">{formatVnd(product.price)}</td>
                     <td className="p-4 text-right">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        aria-label="Lưu trữ sản phẩm"
-                        disabled={deleteProduct.isPending}
-                        onClick={() => {
-                          if (window.confirm(`Lưu trữ sản phẩm "${product.name}"?`)) {
-                            deleteProduct.mutate(product.id);
-                          }
-                        }}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
+                      {canManage && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          aria-label="Lưu trữ sản phẩm"
+                          disabled={deleteProduct.isPending}
+                          onClick={() => {
+                            if (window.confirm(`Lưu trữ sản phẩm "${product.name}"?`)) {
+                              deleteProduct.mutate(product.id);
+                            }
+                          }}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      )}
                     </td>
                   </tr>
                 ))}

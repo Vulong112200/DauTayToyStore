@@ -1,12 +1,17 @@
 'use client';
 
 import { useParams } from 'next/navigation';
+import { AdminQueryError } from '@/components/admin/admin-query-error';
 import { ProductForm } from '@/components/admin/products/product-form';
 import { useAdminProduct } from '@/hooks/use-admin-products';
 
 export default function EditProductPage() {
   const params = useParams<{ id: string }>();
-  const { data: product, isLoading } = useAdminProduct(params.id);
+  const { data: product, isLoading, isError, error, refetch } = useAdminProduct(params.id);
+
+  if (isError) {
+    return <AdminQueryError error={error} onRetry={() => refetch()} />;
+  }
 
   if (isLoading || !product) {
     return <p className="text-muted-foreground">Đang tải...</p>;

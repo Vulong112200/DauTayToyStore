@@ -5,6 +5,7 @@ import Image from 'next/image';
 import { Copy, Trash2, Upload } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAdminMedia, useDeleteMedia, useUploadMedia } from '@/hooks/use-admin-media';
+import { useCanManageContent } from '@/hooks/use-can-manage';
 import { ApiError } from '@/lib/api-client';
 
 function formatBytes(bytes: number): string {
@@ -18,6 +19,7 @@ export default function AdminMediaPage() {
   const { data, isLoading } = useAdminMedia({ page, pageSize: 24 });
   const uploadMedia = useUploadMedia();
   const deleteMedia = useDeleteMedia();
+  const canManage = useCanManageContent();
   const [error, setError] = React.useState<string | null>(null);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
 
@@ -42,17 +44,21 @@ export default function AdminMediaPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="font-display text-2xl font-bold">Thư viện media</h1>
-        <Button size="sm" disabled={uploadMedia.isPending} onClick={() => fileInputRef.current?.click()}>
-          <Upload className="h-4 w-4" />
-          {uploadMedia.isPending ? 'Đang tải lên...' : 'Tải tệp lên'}
-        </Button>
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept="image/*,video/*,application/pdf"
-          className="hidden"
-          onChange={handleFileSelected}
-        />
+        {canManage && (
+          <>
+            <Button size="sm" disabled={uploadMedia.isPending} onClick={() => fileInputRef.current?.click()}>
+              <Upload className="h-4 w-4" />
+              {uploadMedia.isPending ? 'Đang tải lên...' : 'Tải tệp lên'}
+            </Button>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*,video/*,application/pdf"
+              className="hidden"
+              onChange={handleFileSelected}
+            />
+          </>
+        )}
       </div>
 
       {error && <p className="text-sm text-destructive">{error}</p>}
@@ -90,19 +96,21 @@ export default function AdminMediaPage() {
                   >
                     <Copy className="h-4 w-4" />
                   </Button>
-                  <Button
-                    variant="secondary"
-                    size="icon"
-                    aria-label="Xoá tệp"
-                    disabled={deleteMedia.isPending}
-                    onClick={() => {
-                      if (window.confirm('Xoá tệp này khỏi thư viện?')) {
-                        deleteMedia.mutate(asset.id);
-                      }
-                    }}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
+                  {canManage && (
+                    <Button
+                      variant="secondary"
+                      size="icon"
+                      aria-label="Xoá tệp"
+                      disabled={deleteMedia.isPending}
+                      onClick={() => {
+                        if (window.confirm('Xoá tệp này khỏi thư viện?')) {
+                          deleteMedia.mutate(asset.id);
+                        }
+                      }}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  )}
                 </div>
               </div>
             ))}

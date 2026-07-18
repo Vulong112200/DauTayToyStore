@@ -4,6 +4,7 @@ import * as React from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import { type UpdateSiteSettingsInput, updateSiteSettingsSchema } from '@repo/contracts';
+import { AdminQueryError } from '@/components/admin/admin-query-error';
 import { FormError } from '@/components/auth/form-error';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -20,7 +21,7 @@ const numberFieldOptions = {
 };
 
 export default function AdminSettingsPage() {
-  const { data: settings, isLoading } = useAdminSettings();
+  const { data: settings, isLoading, isError, error: queryError, refetch } = useAdminSettings();
   const updateSettings = useUpdateSettings();
   const [error, setError] = React.useState<string | null>(null);
   const [success, setSuccess] = React.useState(false);
@@ -46,6 +47,10 @@ export default function AdminSettingsPage() {
       setError(err instanceof ApiError ? err.message : 'Không thể lưu cấu hình');
     }
   });
+
+  if (isError) {
+    return <AdminQueryError error={queryError} onRetry={() => refetch()} />;
+  }
 
   if (isLoading || !settings) {
     return <p className="text-muted-foreground">Đang tải...</p>;

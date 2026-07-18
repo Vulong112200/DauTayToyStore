@@ -7,6 +7,7 @@ import type { ProductListItem } from '@repo/contracts';
 import { useAuthStore } from '@/store/auth-store';
 import { useAddToWishlist, useIsInWishlist, useRemoveFromWishlist } from '@/hooks/use-wishlist';
 import { cn } from '@/lib/utils';
+import { toastError, toastSuccess } from '@/lib/toast';
 
 function WishlistButtonImpl({
   product,
@@ -38,9 +39,18 @@ function WishlistButtonImpl({
     }
 
     if (isInWishlist) {
-      removeFromWishlist.mutate(product.id);
+      removeFromWishlist.mutate(product.id, {
+        onSuccess: () => toastSuccess('Đã xoá khỏi danh sách yêu thích'),
+        onError: (error) => toastError(error, 'Không thể xoá khỏi danh sách yêu thích'),
+      });
     } else {
-      addToWishlist.mutate({ productId: product.id, product });
+      addToWishlist.mutate(
+        { productId: product.id, product },
+        {
+          onSuccess: () => toastSuccess('Đã thêm vào danh sách yêu thích'),
+          onError: (error) => toastError(error, 'Không thể thêm vào danh sách yêu thích'),
+        },
+      );
     }
   }
 

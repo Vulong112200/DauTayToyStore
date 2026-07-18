@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { ProductCard } from '@/components/catalog/product-card';
+import { ProductGridSkeleton } from '@/components/catalog/product-card-skeleton';
 import { Button } from '@/components/ui/button';
 import { useWishlist } from '@/hooks/use-wishlist';
 import { useAuthStore } from '@/store/auth-store';
@@ -25,7 +26,7 @@ export function WishlistView() {
   }
 
   if (isLoading) {
-    return <p className="text-muted-foreground">Đang tải...</p>;
+    return <ProductGridSkeleton count={4} />;
   }
 
   if (!wishlist || wishlist.items.length === 0) {

@@ -2,12 +2,17 @@
 
 import Link from 'next/link';
 import { Zap } from 'lucide-react';
+import { AdminQueryError } from '@/components/admin/admin-query-error';
 import { useAdminDashboard } from '@/hooks/use-admin-dashboard';
 import { ORDER_STATUS_LABELS } from '@/lib/order-status';
 import { formatVnd } from '@/lib/utils';
 
 export default function AdminDashboardPage() {
-  const { data, isLoading } = useAdminDashboard();
+  const { data, isLoading, isError, error, refetch } = useAdminDashboard();
+
+  if (isError) {
+    return <AdminQueryError error={error} onRetry={() => refetch()} />;
+  }
 
   if (isLoading || !data) {
     return <p className="text-muted-foreground">Đang tải...</p>;

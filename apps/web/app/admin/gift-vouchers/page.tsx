@@ -14,6 +14,7 @@ import {
   useDeleteGiftVoucher,
   useUpdateGiftVoucher,
 } from '@/hooks/use-admin-gift-vouchers';
+import { useCanManageContent } from '@/hooks/use-can-manage';
 import { ApiError } from '@/lib/api-client';
 import { formatVnd } from '@/lib/utils';
 
@@ -23,6 +24,7 @@ export default function AdminGiftVouchersPage() {
   const createVoucher = useCreateGiftVoucher();
   const updateVoucher = useUpdateGiftVoucher();
   const deleteVoucher = useDeleteGiftVoucher();
+  const canManage = useCanManageContent();
 
   const [mode, setMode] = React.useState<'idle' | 'create' | string>('idle');
   const [error, setError] = React.useState<string | null>(null);
@@ -51,7 +53,7 @@ export default function AdminGiftVouchersPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="font-display text-2xl font-bold">Phiếu quà tặng</h1>
-        {mode === 'idle' && (
+        {mode === 'idle' && canManage && (
           <Button size="sm" onClick={() => setMode('create')}>
             <Plus className="h-4 w-4" /> Thêm phiếu quà tặng
           </Button>
@@ -104,29 +106,31 @@ export default function AdminGiftVouchersPage() {
                   {voucher.recipientEmail && ` · ${voucher.recipientEmail}`}
                 </p>
               </div>
-              <div className="flex gap-1">
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  aria-label="Sửa phiếu quà tặng"
-                  onClick={() => setMode(voucher.id)}
-                >
-                  <Pencil className="h-4 w-4" />
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  aria-label="Xoá phiếu quà tặng"
-                  disabled={deleteVoucher.isPending}
-                  onClick={() => {
-                    if (window.confirm(`Xoá phiếu quà tặng "${voucher.code}"?`)) {
-                      deleteVoucher.mutate(voucher.id);
-                    }
-                  }}
-                >
-                  <Trash2 className="h-4 w-4" />
-                </Button>
-              </div>
+              {canManage && (
+                <div className="flex gap-1">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    aria-label="Sửa phiếu quà tặng"
+                    onClick={() => setMode(voucher.id)}
+                  >
+                    <Pencil className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    aria-label="Xoá phiếu quà tặng"
+                    disabled={deleteVoucher.isPending}
+                    onClick={() => {
+                      if (window.confirm(`Xoá phiếu quà tặng "${voucher.code}"?`)) {
+                        deleteVoucher.mutate(voucher.id);
+                      }
+                    }}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
+              )}
             </div>
           ),
         )}

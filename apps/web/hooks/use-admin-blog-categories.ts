@@ -3,6 +3,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { BlogCategoryInput } from '@repo/contracts';
 import { adminBlogCategoriesApi } from '@/lib/api/admin/blog-categories';
+import { deleteMutationCallbacks } from '@/lib/admin-mutations';
 
 const LIST_KEY = 'admin-blog-categories';
 
@@ -31,6 +32,11 @@ export function useDeleteBlogCategory() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (id: string) => adminBlogCategoriesApi.remove(id),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: [LIST_KEY] }),
+    ...deleteMutationCallbacks(
+      queryClient,
+      [LIST_KEY],
+      'Đã xoá danh mục blog',
+      'Không thể xoá danh mục blog',
+    ),
   });
 }

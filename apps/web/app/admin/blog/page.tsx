@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { Plus, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAdminBlogPosts, useDeleteBlogPost } from '@/hooks/use-admin-blog-posts';
+import { useCanManageContent } from '@/hooks/use-can-manage';
 
 const STATUS_LABELS: Record<string, string> = {
   DRAFT: 'Nháp',
@@ -16,6 +17,7 @@ export default function AdminBlogPostsPage() {
   const [q, setQ] = React.useState('');
   const { data, isLoading } = useAdminBlogPosts({ page, pageSize: 20, q: q || undefined });
   const deletePost = useDeleteBlogPost();
+  const canManage = useCanManageContent();
 
   return (
     <div className="space-y-6">
@@ -25,11 +27,13 @@ export default function AdminBlogPostsPage() {
           <Button variant="outline" asChild>
             <Link href="/admin/blog-categories">Danh mục blog</Link>
           </Button>
-          <Button asChild>
-            <Link href="/admin/blog/new">
-              <Plus className="h-4 w-4" /> Thêm bài viết
-            </Link>
-          </Button>
+          {canManage && (
+            <Button asChild>
+              <Link href="/admin/blog/new">
+                <Plus className="h-4 w-4" /> Thêm bài viết
+              </Link>
+            </Button>
+          )}
         </div>
       </div>
 
@@ -80,19 +84,21 @@ export default function AdminBlogPostsPage() {
                       {new Date(post.updatedAt).toLocaleDateString('vi-VN')}
                     </td>
                     <td className="p-4 text-right">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        aria-label="Xoá bài viết"
-                        disabled={deletePost.isPending}
-                        onClick={() => {
-                          if (window.confirm(`Xoá bài viết "${post.title}"?`)) {
-                            deletePost.mutate(post.id);
-                          }
-                        }}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
+                      {canManage && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          aria-label="Xoá bài viết"
+                          disabled={deletePost.isPending}
+                          onClick={() => {
+                            if (window.confirm(`Xoá bài viết "${post.title}"?`)) {
+                              deletePost.mutate(post.id);
+                            }
+                          }}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      )}
                     </td>
                   </tr>
                 ))}

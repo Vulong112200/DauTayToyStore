@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { Baloo_2, Be_Vietnam_Pro } from 'next/font/google';
 import { QueryProvider } from '@/components/providers/query-provider';
 import { ThemeProvider } from '@/components/providers/theme-provider';
+import { Toaster } from '@/components/ui/sonner';
 import { env } from '@/lib/env';
 import './globals.css';
 
@@ -47,6 +48,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body className={`${beVietnamPro.variable} ${baloo2.variable} font-sans`}>
         <ThemeProvider>
           <QueryProvider>{children}</QueryProvider>
+          <Toaster />
         </ThemeProvider>
       </body>
     </html>

@@ -3,6 +3,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { AdminMediaQuery } from '@repo/contracts';
 import { adminMediaApi } from '@/lib/api/admin/media';
+import { deleteMutationCallbacks } from '@/lib/admin-mutations';
 
 const LIST_KEY = 'admin-media';
 
@@ -22,6 +23,6 @@ export function useDeleteMedia() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (id: string) => adminMediaApi.remove(id),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: [LIST_KEY] }),
+    ...deleteMutationCallbacks(queryClient, [LIST_KEY], 'Đã xoá tệp', 'Không thể xoá tệp'),
   });
 }

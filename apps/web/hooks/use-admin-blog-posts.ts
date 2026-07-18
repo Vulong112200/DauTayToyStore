@@ -3,6 +3,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { AdminBlogPostQuery, BlogPostInput } from '@repo/contracts';
 import { adminBlogPostsApi } from '@/lib/api/admin/blog-posts';
+import { deleteMutationCallbacks } from '@/lib/admin-mutations';
 
 const LIST_KEY = 'admin-blog-posts';
 
@@ -42,6 +43,11 @@ export function useDeleteBlogPost() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (id: string) => adminBlogPostsApi.remove(id),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: [LIST_KEY] }),
+    ...deleteMutationCallbacks(
+      queryClient,
+      [LIST_KEY],
+      'Đã xoá bài viết',
+      'Không thể xoá bài viết',
+    ),
   });
 }

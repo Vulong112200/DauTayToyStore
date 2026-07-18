@@ -3,6 +3,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { ComboDealInput } from '@repo/contracts';
 import { adminComboDealsApi } from '@/lib/api/admin/combo-deals';
+import { deleteMutationCallbacks } from '@/lib/admin-mutations';
 
 const LIST_KEY = 'admin-combo-deals';
 
@@ -39,6 +40,11 @@ export function useDeleteComboDeal() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (id: string) => adminComboDealsApi.remove(id),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: [LIST_KEY] }),
+    ...deleteMutationCallbacks(
+      queryClient,
+      [LIST_KEY],
+      'Đã xoá combo',
+      'Không thể xoá combo',
+    ),
   });
 }

@@ -3,6 +3,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { BannerInput } from '@repo/contracts';
 import { adminBannersApi } from '@/lib/api/admin/banners';
+import { deleteMutationCallbacks } from '@/lib/admin-mutations';
 
 const LIST_KEY = 'admin-banners';
 
@@ -31,6 +32,6 @@ export function useDeleteBanner() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (id: string) => adminBannersApi.remove(id),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: [LIST_KEY] }),
+    ...deleteMutationCallbacks(queryClient, [LIST_KEY], 'Đã xoá banner', 'Không thể xoá banner'),
   });
 }
