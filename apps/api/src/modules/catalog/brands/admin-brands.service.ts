@@ -19,9 +19,9 @@ export class AdminBrandsService {
       data: {
         name: input.name,
         slug: input.slug,
-        logoUrl: input.logoUrl,
-        description: input.description,
-        originCountry: input.originCountry,
+        logoUrl: input.logoUrl ?? null,
+        description: input.description ?? null,
+        originCountry: input.originCountry ?? null,
         isActive: input.isActive,
       },
     });
@@ -38,9 +38,11 @@ export class AdminBrandsService {
       data: {
         name: input.name,
         slug: input.slug,
-        logoUrl: input.logoUrl,
-        description: input.description,
-        originCountry: input.originCountry,
+        // `?? null` so clearing an optional field in the form resets it —
+        // Prisma treats `undefined` on `.update()` as "leave untouched".
+        logoUrl: input.logoUrl ?? null,
+        description: input.description ?? null,
+        originCountry: input.originCountry ?? null,
         isActive: input.isActive,
       },
     });

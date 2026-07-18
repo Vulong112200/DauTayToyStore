@@ -14,10 +14,13 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 
 const dateFieldOptions = {
+  // Empty/invalid input becomes `null` (an explicit request to clear "hết hạn"),
+  // not `undefined` — otherwise the cleared field is dropped and the old expiry
+  // is silently kept on save.
   setValueAs: (value: unknown) => {
-    if (!value || typeof value !== 'string') return undefined;
+    if (!value || typeof value !== 'string') return null;
     const date = new Date(value);
-    return Number.isNaN(date.getTime()) ? undefined : date.toISOString();
+    return Number.isNaN(date.getTime()) ? null : date.toISOString();
   },
 };
 

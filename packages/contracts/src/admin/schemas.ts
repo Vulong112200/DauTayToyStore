@@ -33,6 +33,17 @@ const linkUrlSchema = z
     message: 'URL liên kết không hợp lệ',
   });
 
+// Optional fields that an admin must be able to *clear*. A blank form input
+// arrives as an empty string, which we normalize to an explicit `null` (a
+// request to reset the column) while leaving an absent field (`undefined`)
+// untouched so partial updates still work. Without this, an optional
+// `z.string().email()` would reject the empty string outright, and even once
+// past validation a plain `.optional()` value is dropped as `undefined` — which
+// Prisma treats as "leave untouched" on `.update()`, silently keeping the old
+// value. Result type: `<inner> | null | undefined`.
+const clearableOptional = <T extends z.ZodTypeAny>(schema: T) =>
+  z.preprocess((value) => (value === '' ? null : value), schema.nullable()).optional();
+
 export const productStatusSchema = z.enum(['DRAFT', 'PUBLISHED', 'ARCHIVED']);
 export type ProductStatus = z.infer<typeof productStatusSchema>;
 
@@ -319,20 +330,18 @@ export const createUserInputSchema = z.object({
   email: z.string().email('Email không hợp lệ'),
   password: passwordSchema,
   fullName: z.string().min(2, 'Họ tên quá ngắn').max(100),
-  phone: z
-    .string()
-    .regex(/^(0|\+84)(\d{9,10})$/, 'Số điện thoại không hợp lệ')
-    .optional(),
+  phone: clearableOptional(
+    z.string().regex(/^(0|\+84)(\d{9,10})$/, 'Số điện thoại không hợp lệ'),
+  ),
   roles: z.array(z.nativeEnum(RoleName)).min(1, 'Phải chọn ít nhất 1 vai trò'),
 });
 export type CreateUserInput = z.infer<typeof createUserInputSchema>;
 
 export const adminUpdateUserInputSchema = z.object({
   fullName: z.string().min(2, 'Họ tên quá ngắn').max(100).optional(),
-  phone: z
-    .string()
-    .regex(/^(0|\+84)(\d{9,10})$/, 'Số điện thoại không hợp lệ')
-    .optional(),
+  phone: clearableOptional(
+    z.string().regex(/^(0|\+84)(\d{9,10})$/, 'Số điện thoại không hợp lệ'),
+  ),
   isActive: z.boolean().optional(),
 });
 export type AdminUpdateUserInput = z.infer<typeof adminUpdateUserInputSchema>;
@@ -639,12 +648,11 @@ export type AdminMediaQuery = z.infer<typeof adminMediaQuerySchema>;
 
 export const siteSettingsSchema = z.object({
   siteName: z.string().min(1, 'Tên cửa hàng không được để trống').max(150),
-  contactEmail: z.string().email('Email không hợp lệ').optional(),
-  contactPhone: z
-    .string()
-    .regex(/^(0|\+84)(\d{9,10})$/, 'Số điện thoại không hợp lệ')
-    .optional(),
-  facebookUrl: z.string().url('URL không hợp lệ').optional(),
+  contactEmail: clearableOptional(z.string().email('Email không hợp lệ')),
+  contactPhone: clearableOptional(
+    z.string().regex(/^(0|\+84)(\d{9,10})$/, 'Số điện thoại không hợp lệ'),
+  ),
+  facebookUrl: clearableOptional(z.string().url('URL không hợp lệ')),
   freeShippingThreshold: z.coerce.number().int().min(0),
   flatShippingFee: z.coerce.number().int().min(0),
 });
@@ -666,16 +674,16 @@ const giftVoucherCodeSchema = z
 export const giftVoucherInputSchema = z.object({
   code: giftVoucherCodeSchema,
   amount: z.coerce.number().int().min(1),
-  recipientEmail: z.string().email('Email không hợp lệ').optional(),
-  expiresAt: z.string().datetime().optional(),
+  recipientEmail: clearableOptional(z.string().email('Email không hợp lệ')),
+  expiresAt: clearableOptional(z.string().datetime()),
   isActive: z.boolean().default(true),
 });
 export type GiftVoucherInput = z.infer<typeof giftVoucherInputSchema>;
 
 export const updateGiftVoucherInputSchema = z.object({
   balance: z.coerce.number().int().min(0).optional(),
-  recipientEmail: z.string().email('Email không hợp lệ').optional(),
-  expiresAt: z.string().datetime().optional(),
+  recipientEmail: clearableOptional(z.string().email('Email không hợp lệ')),
+  expiresAt: clearableOptional(z.string().datetime()),
   isActive: z.boolean().optional(),
 });
 export type UpdateGiftVoucherInput = z.infer<typeof updateGiftVoucherInputSchema>;

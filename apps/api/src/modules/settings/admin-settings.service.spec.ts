@@ -57,5 +57,18 @@ describe('AdminSettingsService', () => {
       });
       expect(result.flatShippingFee).toBe(25_000);
     });
+
+    it('clears an optional contact field when passed null', async () => {
+      prisma.setting.findUnique.mockResolvedValue({
+        key: 'site',
+        value: { siteName: 'Custom Store', contactEmail: 'old@example.com' },
+      });
+
+      const result = await service.updateSettings({ contactEmail: null });
+
+      const [args] = prisma.setting.upsert.mock.calls[0];
+      expect(args.update.value.contactEmail).toBeNull();
+      expect(result.contactEmail).toBeNull();
+    });
   });
 });

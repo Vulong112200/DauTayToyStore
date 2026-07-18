@@ -42,12 +42,14 @@ export class AdminCategoriesService {
         parentId: input.parentId ?? null,
         name: input.name,
         slug: input.slug,
-        description: input.description,
-        imageUrl: input.imageUrl,
+        // `?? null` so clearing an optional field in the form resets it —
+        // Prisma treats `undefined` on `.update()` as "leave untouched".
+        description: input.description ?? null,
+        imageUrl: input.imageUrl ?? null,
         sortOrder: input.sortOrder,
         isActive: input.isActive,
-        metaTitle: input.metaTitle,
-        metaDescription: input.metaDescription,
+        metaTitle: input.metaTitle ?? null,
+        metaDescription: input.metaDescription ?? null,
       },
     });
 

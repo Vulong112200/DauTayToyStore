@@ -127,6 +127,26 @@ describe('AdminUsersService', () => {
         }),
       );
     });
+
+    it('clears phone when passed null', async () => {
+      prisma.user.findUnique.mockResolvedValue({ id: 'u1' });
+      prisma.user.update.mockResolvedValue(userRow);
+
+      await service.update('admin1', 'u1', { phone: null });
+
+      const [args] = prisma.user.update.mock.calls[0];
+      expect(args.data).toEqual({ phone: null });
+    });
+
+    it('leaves phone untouched when it is not provided (undefined)', async () => {
+      prisma.user.findUnique.mockResolvedValue({ id: 'u1' });
+      prisma.user.update.mockResolvedValue(userRow);
+
+      await service.update('admin1', 'u1', { fullName: 'Only name' });
+
+      const [args] = prisma.user.update.mock.calls[0];
+      expect(args.data).not.toHaveProperty('phone');
+    });
   });
 
   describe('updateRoles', () => {

@@ -82,9 +82,14 @@ export class AdminGiftVouchersService {
     const voucher = await this.prisma.giftVoucher.update({
       where: { id },
       data: {
+        // `!== undefined` keeps partial-update semantics (an omitted field is
+        // left untouched); an explicit `null` DOES flow through so the admin can
+        // clear the field. `expiresAt` guards against `new Date(null)` (epoch 0).
         ...(input.balance !== undefined && { balance: input.balance }),
         ...(input.recipientEmail !== undefined && { recipientEmail: input.recipientEmail }),
-        ...(input.expiresAt !== undefined && { expiresAt: new Date(input.expiresAt) }),
+        ...(input.expiresAt !== undefined && {
+          expiresAt: input.expiresAt === null ? null : new Date(input.expiresAt),
+        }),
         ...(input.isActive !== undefined && { isActive: input.isActive }),
       },
       select: SELECT,

@@ -168,24 +168,28 @@ export class AdminProductsService {
   }
 
   private toBaseData(input: ProductInput) {
+    // Optional fields use `?? null` so clearing a value in the admin form
+    // actually resets the column. On `.update()`, Prisma treats `undefined`
+    // as "leave untouched", which would otherwise make an already-set optional
+    // field impossible to clear.
     return {
       name: input.name,
       slug: input.slug,
       sku: input.sku,
-      barcode: input.barcode,
-      brandId: input.brandId,
+      barcode: input.barcode ?? null,
+      brandId: input.brandId ?? null,
       status: input.status,
-      shortDescription: input.shortDescription,
-      description: input.description,
+      shortDescription: input.shortDescription ?? null,
+      description: input.description ?? null,
       price: input.price,
-      compareAtPrice: input.compareAtPrice,
-      material: input.material,
-      origin: input.origin,
-      ageMin: input.ageMin,
-      ageMax: input.ageMax,
-      weightGrams: input.weightGrams,
-      metaTitle: input.metaTitle,
-      metaDescription: input.metaDescription,
+      compareAtPrice: input.compareAtPrice ?? null,
+      material: input.material ?? null,
+      origin: input.origin ?? null,
+      ageMin: input.ageMin ?? null,
+      ageMax: input.ageMax ?? null,
+      weightGrams: input.weightGrams ?? null,
+      metaTitle: input.metaTitle ?? null,
+      metaDescription: input.metaDescription ?? null,
     };
   }
 

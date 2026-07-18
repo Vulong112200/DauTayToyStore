@@ -87,15 +87,19 @@ export class AdminCouponsService {
   }
 
   private toBaseData(input: CouponInput) {
+    // Optional fields are coerced `undefined -> null` so that clearing a field
+    // in the admin form actually resets it. Prisma treats `undefined` on
+    // `.update()` as "leave this column untouched", which would otherwise make
+    // it impossible to clear an already-set optional value (e.g. maxDiscountAmount).
     return {
       code: input.code,
-      description: input.description,
+      description: input.description ?? null,
       type: input.type,
       value: input.value,
-      minOrderAmount: input.minOrderAmount,
-      maxDiscountAmount: input.maxDiscountAmount,
-      usageLimit: input.usageLimit,
-      perUserLimit: input.perUserLimit,
+      minOrderAmount: input.minOrderAmount ?? null,
+      maxDiscountAmount: input.maxDiscountAmount ?? null,
+      usageLimit: input.usageLimit ?? null,
+      perUserLimit: input.perUserLimit ?? null,
       startsAt: input.startsAt ? new Date(input.startsAt) : null,
       expiresAt: input.expiresAt ? new Date(input.expiresAt) : null,
       isActive: input.isActive,

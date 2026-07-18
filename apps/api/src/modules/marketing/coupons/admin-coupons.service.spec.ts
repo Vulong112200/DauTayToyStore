@@ -93,6 +93,24 @@ describe('AdminCouponsService', () => {
 
       await expect(service.update('missing', input)).rejects.toThrow(NotFoundException);
     });
+
+    it('clears optional fields to null when they are omitted (the reported bug)', async () => {
+      prisma.coupon.findUnique.mockResolvedValue({ id: 'c1' });
+      prisma.coupon.findFirst.mockResolvedValue(null);
+      prisma.coupon.update.mockResolvedValue(couponRow);
+
+      // The admin cleared "Giảm tối đa" (and other optional fields) — the input
+      // arrives with those keys absent. They must be written as explicit null,
+      // not dropped as undefined (which Prisma would leave untouched).
+      await service.update('c1', input);
+
+      const [args] = prisma.coupon.update.mock.calls[0];
+      expect(args.data.maxDiscountAmount).toBeNull();
+      expect(args.data.minOrderAmount).toBeNull();
+      expect(args.data.usageLimit).toBeNull();
+      expect(args.data.perUserLimit).toBeNull();
+      expect(args.data.description).toBeNull();
+    });
   });
 
   describe('remove', () => {

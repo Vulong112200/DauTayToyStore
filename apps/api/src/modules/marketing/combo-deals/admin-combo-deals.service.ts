@@ -99,7 +99,9 @@ export class AdminComboDealsService {
     return {
       name: input.name,
       slug: input.slug,
-      description: input.description,
+      // `?? null` so clearing the description in the form resets it — Prisma
+      // treats `undefined` on `.update()` as "leave untouched".
+      description: input.description ?? null,
       comboPrice: input.comboPrice,
       isActive: input.isActive,
       startsAt: input.startsAt ? new Date(input.startsAt) : null,

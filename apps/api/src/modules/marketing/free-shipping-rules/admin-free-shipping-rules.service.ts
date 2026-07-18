@@ -1,4 +1,5 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import type { AdminFreeShippingRule, FreeShippingRuleInput } from '@repo/contracts';
 import { PrismaService } from '../../../infra/prisma/prisma.service';
 
@@ -34,7 +35,10 @@ export class AdminFreeShippingRulesService {
     return {
       name: input.name,
       minOrderAmount: input.minOrderAmount,
-      applicableProvinces: input.applicableProvinces ?? undefined,
+      // `Prisma.DbNull` (not `undefined`) so clearing the province list in the
+      // form resets the JSON column to NULL — `undefined` would leave it
+      // untouched on `.update()`, making an already-set list impossible to clear.
+      applicableProvinces: input.applicableProvinces ?? Prisma.DbNull,
       isActive: input.isActive,
       startsAt: input.startsAt ? new Date(input.startsAt) : null,
       endsAt: input.endsAt ? new Date(input.endsAt) : null,

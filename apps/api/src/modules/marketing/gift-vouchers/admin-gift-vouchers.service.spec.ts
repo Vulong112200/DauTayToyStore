@@ -82,6 +82,36 @@ describe('AdminGiftVouchersService', () => {
         select: expect.any(Object),
       });
     });
+
+    it('clears expiresAt to null (not epoch) when passed null', async () => {
+      prisma.giftVoucher.findUnique.mockResolvedValue({ id: 'v1' });
+      prisma.giftVoucher.update.mockResolvedValue(voucherRow);
+
+      await service.update('v1', { expiresAt: null });
+
+      const [args] = prisma.giftVoucher.update.mock.calls[0];
+      expect(args.data).toEqual({ expiresAt: null });
+    });
+
+    it('clears recipientEmail when passed null', async () => {
+      prisma.giftVoucher.findUnique.mockResolvedValue({ id: 'v1' });
+      prisma.giftVoucher.update.mockResolvedValue(voucherRow);
+
+      await service.update('v1', { recipientEmail: null });
+
+      const [args] = prisma.giftVoucher.update.mock.calls[0];
+      expect(args.data).toEqual({ recipientEmail: null });
+    });
+
+    it('converts a provided expiresAt string into a Date', async () => {
+      prisma.giftVoucher.findUnique.mockResolvedValue({ id: 'v1' });
+      prisma.giftVoucher.update.mockResolvedValue(voucherRow);
+
+      await service.update('v1', { expiresAt: '2026-12-31T00:00:00.000Z' });
+
+      const [args] = prisma.giftVoucher.update.mock.calls[0];
+      expect(args.data.expiresAt).toEqual(new Date('2026-12-31T00:00:00.000Z'));
+    });
   });
 
   describe('remove', () => {

@@ -130,16 +130,19 @@ export class AdminBlogPostsService {
   }
 
   private toBaseData(input: BlogPostInput) {
+    // Optional fields use `?? null` so clearing a value in the admin form
+    // actually resets the column (Prisma treats `undefined` on `.update()` as
+    // "leave untouched", blocking a clear of an already-set optional field).
     return {
       title: input.title,
       slug: input.slug,
-      excerpt: input.excerpt,
+      excerpt: input.excerpt ?? null,
       content: input.content,
-      coverImageUrl: input.coverImageUrl,
-      categoryId: input.categoryId,
+      coverImageUrl: input.coverImageUrl ?? null,
+      categoryId: input.categoryId ?? null,
       status: input.status,
-      metaTitle: input.metaTitle,
-      metaDescription: input.metaDescription,
+      metaTitle: input.metaTitle ?? null,
+      metaDescription: input.metaDescription ?? null,
     };
   }
 
