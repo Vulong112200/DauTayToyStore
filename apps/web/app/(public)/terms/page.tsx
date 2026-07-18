@@ -28,8 +28,8 @@ export default function TermsPage() {
           <h2>2. Giá cả và thanh toán</h2>
           <p>
             Giá sản phẩm được niêm yết bằng đồng Việt Nam (VNĐ) và đã bao gồm các loại thuế áp
-            dụng (nếu có). Hiện tại DauTayToy Store hỗ trợ hình thức thanh toán khi nhận hàng
-            (COD).
+            dụng (nếu có). DauTayToy Store hỗ trợ thanh toán khi nhận hàng (COD) và thanh toán
+            trực tuyến qua VNPay hoặc MoMo.
           </p>
 
           <h2>3. Giao hàng</h2>

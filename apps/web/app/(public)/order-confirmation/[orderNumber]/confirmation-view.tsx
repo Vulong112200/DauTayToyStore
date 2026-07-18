@@ -10,16 +10,20 @@ import { formatVnd } from '@/lib/utils';
 
 const LAST_ORDER_STORAGE_KEY = 'dautaytoy-last-order';
 
+// Wording is gateway-agnostic on purpose: the return redirect only carries
+// `paymentStatus` (no gateway id) and this same page handles both VNPay and MoMo
+// returns, so it must never name a specific gateway (it used to hardcode "VNPay",
+// which was wrong for a MoMo payment).
 const PAYMENT_STATUS_BANNER = {
   success: {
     icon: CheckCircle2,
     className: 'text-green-600',
-    message: 'Thanh toán VNPay thành công!',
+    message: 'Thanh toán online thành công!',
   },
   failed: {
     icon: XCircle,
     className: 'text-destructive',
-    message: 'Thanh toán VNPay thất bại hoặc đã bị huỷ. Vui lòng thử lại hoặc chọn COD.',
+    message: 'Thanh toán online thất bại hoặc đã bị huỷ. Vui lòng thử lại hoặc chọn COD.',
   },
   invalid: {
     icon: XCircle,
