@@ -12,9 +12,11 @@
 -- So enabling RLS with NO policies denies the public PostgREST paths (anon/authenticated)
 -- while leaving the backend completely unaffected. That is exactly the lockdown we want.
 --
--- The DO block loops over all base tables in `public` (excluding Prisma's own
--- `_prisma_migrations` bookkeeping table) so the fix covers every current table in one
--- pass. ENABLE (not FORCE) keeps the owner-role bypass intact for Prisma.
+-- The DO block loops over every base table in `public` — including Prisma's own
+-- `_prisma_migrations` bookkeeping table, which Supabase also flags. Enabling RLS on it
+-- is safe: the migrate engine connects as the owner role and bypasses RLS, so it can
+-- still read/write its migration history. ENABLE (not FORCE) keeps that owner bypass
+-- intact for both Prisma runtime queries and the migrate engine.
 
 DO $$
 DECLARE
@@ -24,7 +26,6 @@ BEGIN
     SELECT tablename
     FROM pg_tables
     WHERE schemaname = 'public'
-      AND tablename <> '_prisma_migrations'
   LOOP
     EXECUTE format('ALTER TABLE public.%I ENABLE ROW LEVEL SECURITY;', r.tablename);
   END LOOP;
